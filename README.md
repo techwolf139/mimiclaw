@@ -1,5 +1,9 @@
 # MimiClaw
 
+<p align="center">
+  <img src="assets/banner.png" alt="MimiClaw" width="480" />
+</p>
+
 **OpenClaw on a $10 device. Local memory. Privacy-first. No OS.**
 
 MimiClaw is a minimal reimplementation of [OpenClaw](https://github.com/openclaw/openclaw)'s WebSocket gateway control plane, built to run on an ESP32 microcontroller. It replaces the full Node.js stack with bare-metal firmware, bringing personal AI assistant infrastructure to a $10 chip with no operating system required.
