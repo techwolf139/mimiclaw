@@ -7,11 +7,8 @@
 
 ## P0 — Core Agent Capabilities
 
-### [ ] Tool Use Loop (multi-turn agent iteration)
-- **nanobot**: `loop.py` L167-210 — while loop calls LLM, checks `response.has_tool_calls`, executes tools, feeds results back into messages, repeats until LLM stops calling tools (max 20 iterations)
-- **MimiClaw**: `agent_loop.c` only makes a single LLM call (one-shot), cannot use any tools
-- **Scope**: Need to parse Anthropic API `tool_use` content blocks, implement tool execution loop
-- **Note**: Anthropic tool_use format differs from OpenAI — uses content blocks, not function_call
+### [x] ~~Tool Use Loop (multi-turn agent iteration)~~
+- Implemented: `agent_loop.c` ReAct loop with `llm_chat_tools()`, max 10 iterations, non-streaming JSON parsing
 
 ### [ ] Memory Write via Tool Use (agent-driven memory persistence)
 - **openclaw**: Agent uses standard `write`/`edit` tools to write `MEMORY.md` and `memory/YYYY-MM-DD.md`; system prompt instructs agent to persist important information; pre-compaction memory flush triggers a silent agent turn to save durable memories before context window limit
@@ -19,20 +16,13 @@
 - **Scope**: Expose `memory_write` and `memory_append_today` as tool_use tools for Claude; add system prompt guidance on when to persist memory; optionally add pre-compaction flush (trigger memory save when session history nears `MIMI_SESSION_MAX_MSGS`)
 - **Depends on**: Tool Use Loop
 
-### [ ] Tool Registry + Built-in Tools
-- **nanobot**: `tools/registry.py` — dynamic tool registration/execution, `tools/base.py` defines abstract Tool base class
-- **nanobot built-in tools**:
-  - `read_file` — read files (`tools/filesystem.py`)
-  - `write_file` — write files
-  - `edit_file` — edit files
-  - `list_dir` — list directory
-  - `exec` — execute shell commands (`tools/shell.py`)
-  - `web_search` — web search (`tools/web.py`)
-  - `web_fetch` — fetch web pages
-  - `message` — send message to user (`tools/message.py`)
-  - `spawn` — launch subagent (`tools/spawn.py`)
-- **MimiClaw**: No tool system at all
-- **Recommendation**: Reasonable tool subset for ESP32: `read_file`, `write_file`, `list_dir` (SPIFFS), `message`. Shell/web not suitable for MCU
+### [x] ~~Tool Registry + web_search Tool~~
+- Implemented: `tools/tool_registry.c` — tool registration, JSON schema builder, dispatch by name
+- Implemented: `tools/tool_web_search.c` — Brave Search API via HTTPS (direct + proxy support)
+
+### [ ] More Built-in Tools
+- **nanobot built-in tools** not yet ported: `read_file`, `write_file`, `edit_file`, `list_dir`, `message`
+- **Recommendation**: Reasonable tool subset for ESP32: `read_file`, `write_file`, `list_dir` (SPIFFS), `message`, `memory_write`
 
 ### [ ] Subagent / Spawn Background Tasks
 - **nanobot**: `subagent.py` — SubagentManager spawns independent agent instances with isolated tool sets and system prompts, announces results back to main agent via system channel
@@ -77,10 +67,8 @@
 - **MimiClaw**: `context_builder.c` only reads last 3 days
 - **Recommendation**: Make configurable, but mind token budget
 
-### [ ] System Prompt Tool Guidance
-- **nanobot**: `context.py` L74-101 — includes current time, workspace path, tool usage instructions
-- **MimiClaw**: Has current time, but lacks tool usage guide and workspace description
-- **Depends on**: Tool Use implementation
+### [x] ~~System Prompt Tool Guidance~~
+- Implemented: `context_builder.c` includes tool usage guidance in system prompt
 
 ### [ ] Message Metadata (media, reply_to, metadata)
 - **nanobot**: `bus/events.py` — InboundMessage has media, metadata fields; OutboundMessage has reply_to
@@ -116,10 +104,9 @@
 - **MimiClaw**: Not implemented
 - **Recommendation**: Requires extra HTTPS request to Whisper API: download Telegram voice -> forward -> get text
 
-### [ ] YAML Config File System
-- **nanobot**: `config/loader.py` + `config/schema.py` — Pydantic config validation, YAML config support
-- **MimiClaw**: All configuration via NVS key-value storage
-- **Recommendation**: Current NVS approach is suitable for MCU, no change needed
+### [x] ~~Build-time Config File~~
+- Implemented: `mimi_secrets.h` — build-time credentials with highest priority over NVS/CLI
+- Replaces need for YAML config; suitable for MCU workflow
 
 ### [ ] WebSocket Gateway Protocol Enhancement
 - **nanobot**: Gateway port 18790 + richer protocol
@@ -150,32 +137,34 @@
 
 - [x] Telegram Bot long polling (getUpdates)
 - [x] Message Bus (inbound/outbound queues)
-- [x] Agent Loop basic flow (single LLM call)
-- [x] Claude API (Anthropic Messages API + SSE streaming)
-- [x] Context Builder (system prompt + bootstrap files + memory)
+- [x] Agent Loop with ReAct tool use (multi-turn, max 10 iterations)
+- [x] Claude API (Anthropic Messages API, non-streaming, tool_use protocol)
+- [x] Tool Registry + web_search tool (Brave Search API)
+- [x] Context Builder (system prompt + bootstrap files + memory + tool guidance)
 - [x] Memory Store (MEMORY.md + daily notes)
 - [x] Session Manager (JSONL per chat_id, ring buffer history)
 - [x] WebSocket Gateway (port 18789, JSON protocol)
-- [x] Serial CLI (esp_console, 14 commands)
-- [x] HTTP CONNECT Proxy (Telegram + Claude API via proxy tunnel)
+- [x] Serial CLI (esp_console, 15 commands)
+- [x] HTTP CONNECT Proxy (Telegram + Claude API + Brave Search via proxy tunnel)
 - [x] OTA Update
 - [x] WiFi Manager (NVS credentials, exponential backoff)
 - [x] SPIFFS storage
-- [x] NVS configuration (token, API key, model)
+- [x] Build-time config (`mimi_secrets.h`, highest priority over NVS)
+- [x] NVS configuration (token, API key, model, search key)
 
 ---
 
 ## Suggested Implementation Order
 
 ```
-1. Tool Use Loop + Tool Registry    <- this determines whether the agent is truly "intelligent"
+1. [done] Tool Use Loop + Tool Registry + web_search
 2. Memory Write via Tool Use         <- makes the agent actually remember
 3. Built-in Tools (read_file, write_file, message)
-3. Telegram Allowlist (allow_from)   <- security essential
-4. Bootstrap File Completion (AGENTS.md, TOOLS.md)
-5. Subagent (simplified)
-6. Telegram Markdown -> HTML
-7. Media Handling
-8. Cron / Heartbeat
-9. Other enhancements
+4. Telegram Allowlist (allow_from)   <- security essential
+5. Bootstrap File Completion (AGENTS.md, TOOLS.md)
+6. Subagent (simplified)
+7. Telegram Markdown -> HTML
+8. Media Handling
+9. Cron / Heartbeat
+10. Other enhancements
 ```

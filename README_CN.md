@@ -62,22 +62,54 @@ git clone https://github.com/memovai/mimiclaw.git
 cd mimiclaw
 
 idf.py set-target esp32s3
+```
+
+### 配置
+
+**方式 A：配置文件（推荐）** — 填一次，编译时写入固件：
+
+```bash
+cp main/mimi_secrets.h.example main/mimi_secrets.h
+```
+
+编辑 `main/mimi_secrets.h`：
+
+```c
+#define MIMI_SECRET_WIFI_SSID       "你的WiFi名"
+#define MIMI_SECRET_WIFI_PASS       "你的WiFi密码"
+#define MIMI_SECRET_TG_TOKEN        "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
+#define MIMI_SECRET_API_KEY         "sk-ant-api03-xxxxx"
+#define MIMI_SECRET_SEARCH_KEY      ""              // 可选：Brave Search API key
+#define MIMI_SECRET_PROXY_HOST      "10.0.0.1"      // 可选：代理地址
+#define MIMI_SECRET_PROXY_PORT      "7897"           // 可选：代理端口
+```
+
+然后编译烧录：
+
+```bash
 idf.py build
 idf.py -p /dev/ttyACM0 flash monitor
 ```
 
-### 设置
+配置文件的值**优先级最高** — 会覆盖 CLI 设置的值。
 
-烧录后会出现串口终端，输入以下命令：
+> **注意**：修改 `mimi_secrets.h` 后，需要先执行 `touch main/mimi_config.h` 再 `idf.py build`，否则不会重新编译。
+
+**方式 B：串口命令行** — 烧录后在运行时配置：
+
+```bash
+idf.py build
+idf.py -p /dev/ttyACM0 flash monitor
+```
 
 ```
-mimi> wifi_set YourWiFiName YourWiFiPassword
+mimi> wifi_set 你的WiFi名 你的WiFi密码
 mimi> set_tg_token 123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11
 mimi> set_api_key sk-ant-api03-xxxxx
 mimi> restart
 ```
 
-就这样。重启后在 Telegram 找到你的 Bot，开始聊天。
+CLI 设置的值存在 NVS（持久 Flash）中，仅在配置文件未设置对应值时生效。
 
 ### 代理配置（国内用户）
 
@@ -85,15 +117,14 @@ mimi> restart
 
 **前提**：局域网内有一个支持 HTTP CONNECT 的代理（Clash Verge、V2Ray 等），并开启了「允许局域网连接」。
 
+推荐直接在 `mimi_secrets.h` 中配置代理（见上方方式 A），也可以用命令行：
+
 ```
 mimi> set_proxy 10.0.0.1 7897
 mimi> restart
 ```
 
-- `10.0.0.1` — 代理机器的局域网 IP
-- `7897` — 代理的 HTTP 端口（不是 SOCKS 端口）
-
-设置后所有 HTTPS 请求通过 CONNECT 隧道发出，TLS 证书正常验证。清除代理恢复直连：
+清除代理恢复直连：
 
 ```
 mimi> clear_proxy
@@ -102,18 +133,22 @@ mimi> restart
 
 > **提示**：确保 ESP32-S3 和代理机器在同一局域网。Clash Verge 在「设置 → 允许局域网」中开启。
 
-### 更多命令
+### 所有命令
 
 ```
-mimi> wifi_status          # 连上了吗？
-mimi> set_model claude-opus-4-6   # 换个模型
-mimi> set_proxy 10.0.0.1 7897     # 可选：通过 HTTP 代理
-mimi> clear_proxy          # 可选：清除代理，直连
-mimi> memory_read          # 看看它记住了什么
-mimi> heap_info            # 还剩多少内存？
-mimi> session_list         # 列出所有会话
-mimi> session_clear 12345  # 删除一个会话
-mimi> restart              # 重启
+mimi> wifi_set <ssid> <pass>   # 设置 WiFi
+mimi> wifi_status              # 连上了吗？
+mimi> set_tg_token <token>     # 设置 Telegram Bot Token
+mimi> set_api_key <key>        # 设置 Anthropic API Key
+mimi> set_model claude-opus-4-6 # 换个模型
+mimi> set_search_key <key>     # 设置 Brave Search API Key（web_search 工具用）
+mimi> set_proxy 10.0.0.1 7897  # 通过 HTTP 代理
+mimi> clear_proxy              # 清除代理，直连
+mimi> memory_read              # 看看它记住了什么
+mimi> heap_info                # 还剩多少内存？
+mimi> session_list             # 列出所有会话
+mimi> session_clear 12345      # 删除一个会话
+mimi> restart                  # 重启
 ```
 
 ## 记忆
@@ -128,12 +163,23 @@ MimiClaw 把所有数据存为纯文本文件，可以直接读取和编辑：
 | `2026-02-05.md` | 每日笔记 — 今天发生了什么 |
 | `tg_12345.jsonl` | 聊天记录 — 你和它的对话 |
 
+## 工具
+
+MimiClaw 使用 Anthropic 的 tool use 协议 — Claude 在对话中可以调用工具，循环执行直到任务完成（ReAct 模式）。
+
+| 工具 | 说明 |
+|------|------|
+| `web_search` | 通过 Brave Search API 搜索网页，获取实时信息 |
+
+启用网页搜索需要设置 [Brave Search API key](https://brave.com/search/api/)，在配置文件或 CLI（`set_search_key`）中设置。
+
 ## 其他功能
 
 - **WebSocket 网关** — 端口 18789，局域网内用任意 WebSocket 客户端连接
 - **OTA 更新** — WiFi 远程刷固件，无需 USB
 - **双核** — 网络 I/O 和 AI 处理分别跑在不同 CPU 核心
 - **HTTP 代理** — CONNECT 隧道，适配受限网络
+- **工具调用** — ReAct Agent 循环，Anthropic tool use 协议
 
 ## 开发者
 

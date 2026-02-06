@@ -20,41 +20,46 @@ Telegram App (User)
 │   │  Poller      │       └────────┬─────────┘     │
 │   │  (Core 0)    │               │                │
 │   └─────────────┘               ▼                │
-│                          ┌──────────────┐         │
-│   ┌─────────────┐       │  Agent Loop   │         │
-│   │  WebSocket   │──────▶│  (Core 1)    │         │
-│   │  Server      │       │              │         │
-│   │  (:18789)    │       │  Context ──▶ LLM Proxy │
-│   └─────────────┘       │  Builder     (HTTPS)   │
-│                          └──────┬───────┘         │
-│   ┌─────────────┐               │                │
-│   │  Serial CLI  │               ▼                │
-│   │  (Core 0)    │       ┌──────────────┐         │
-│   └─────────────┘       │ Outbound Queue│         │
-│                          └──────┬───────┘         │
-│                                 │                 │
-│                          ┌──────▼───────┐         │
-│                          │  Outbound    │         │
-│                          │  Dispatch    │         │
-│                          │  (Core 0)    │         │
-│                          └──┬────────┬──┘         │
-│                             │        │            │
-│                      Telegram    WebSocket        │
-│                      sendMessage  send            │
-│                                                  │
-│   ┌──────────────────────────────────────────┐   │
-│   │  SPIFFS (12 MB)                          │   │
-│   │  /spiffs/config/  SOUL.md, USER.md       │   │
-│   │  /spiffs/memory/  MEMORY.md, YYYY-MM-DD  │   │
-│   │  /spiffs/sessions/ tg_<chat_id>.jsonl    │   │
-│   └──────────────────────────────────────────┘   │
-└──────────────────────────────────────────────────┘
+│                     ┌────────────────────────┐    │
+│   ┌─────────────┐  │     Agent Loop          │    │
+│   │  WebSocket   │─▶│     (Core 1)           │    │
+│   │  Server      │  │                        │    │
+│   │  (:18789)    │  │  Context ──▶ LLM Proxy │    │
+│   └─────────────┘  │  Builder      (HTTPS)   │    │
+│                     │       ▲          │      │    │
+│   ┌─────────────┐  │       │     tool_use?   │    │
+│   │  Serial CLI  │  │       │          ▼      │    │
+│   │  (Core 0)    │  │  Tool Results ◀─ Tools  │    │
+│   └─────────────┘  │              (web_search)│    │
+│                     └──────────┬─────────────┘    │
+│                                │                  │
+│                         ┌──────▼───────┐          │
+│                         │ Outbound Queue│          │
+│                         └──────┬───────┘          │
+│                                │                  │
+│                         ┌──────▼───────┐          │
+│                         │  Outbound    │          │
+│                         │  Dispatch    │          │
+│                         │  (Core 0)    │          │
+│                         └──┬────────┬──┘          │
+│                            │        │             │
+│                     Telegram    WebSocket          │
+│                     sendMessage  send              │
+│                                                   │
+│   ┌──────────────────────────────────────────┐    │
+│   │  SPIFFS (12 MB)                          │    │
+│   │  /spiffs/config/  SOUL.md, USER.md       │    │
+│   │  /spiffs/memory/  MEMORY.md, YYYY-MM-DD  │    │
+│   │  /spiffs/sessions/ tg_<chat_id>.jsonl    │    │
+│   └──────────────────────────────────────────┘    │
+└───────────────────────────────────────────────────┘
          │
-         │  Anthropic Messages API (HTTPS + SSE)
+         │  Anthropic Messages API (HTTPS)
+         │  + Brave Search API (HTTPS)
          ▼
-   ┌───────────┐
-   │ Claude API │
-   └───────────┘
+   ┌───────────┐   ┌──────────────┐
+   │ Claude API │   │ Brave Search │
+   └───────────┘   └──────────────┘
 ```
 
 ---
@@ -67,12 +72,18 @@ Telegram App (User)
 3. Message pushed to Inbound Queue (FreeRTOS xQueue)
 4. Agent Loop (Core 1) pops message:
    a. Load session history from SPIFFS (JSONL)
-   b. Build system prompt (SOUL.md + USER.md + MEMORY.md + recent notes)
-   c. Build messages array (history + current message)
-   d. Call Claude API via HTTPS (SSE streaming)
-   e. Accumulate streamed response tokens
-   f. Save user + assistant messages to session file
-   g. Push response to Outbound Queue
+   b. Build system prompt (SOUL.md + USER.md + MEMORY.md + recent notes + tool guidance)
+   c. Build cJSON messages array (history + current message)
+   d. ReAct loop (max 10 iterations):
+      i.   Call Claude API via HTTPS (non-streaming, with tools array)
+      ii.  Parse JSON response → text blocks + tool_use blocks
+      iii. If stop_reason == "tool_use":
+           - Execute each tool (e.g. web_search → Brave Search API)
+           - Append assistant content + tool_result to messages
+           - Continue loop
+      iv.  If stop_reason == "end_turn": break with final text
+   e. Save user message + final assistant text to session file
+   f. Push response to Outbound Queue
 5. Outbound Dispatch (Core 0) pops response:
    a. Route by channel field ("telegram" → sendMessage, "websocket" → WS frame)
 6. User receives reply
@@ -85,7 +96,9 @@ Telegram App (User)
 ```
 main/
 ├── mimi.c                  Entry point — app_main() orchestrates init + startup
-├── mimi_config.h           All compile-time constants in one place
+├── mimi_config.h           All compile-time constants + build-time secrets include
+├── mimi_secrets.h          Build-time credentials (gitignored, highest priority)
+├── mimi_secrets.h.example  Template for mimi_secrets.h
 │
 ├── bus/
 │   ├── message_bus.h       mimi_msg_t struct, queue API
@@ -100,14 +113,20 @@ main/
 │   └── telegram_bot.c      Long polling loop, JSON parsing, message splitting
 │
 ├── llm/
-│   ├── llm_proxy.h         llm_chat() API
-│   └── llm_proxy.c         Anthropic Messages API, SSE stream parser
+│   ├── llm_proxy.h         llm_chat() + llm_chat_tools() API, tool_use types
+│   └── llm_proxy.c         Anthropic Messages API (non-streaming), tool_use parsing
 │
 ├── agent/
 │   ├── agent_loop.h        Agent task init/start
-│   ├── agent_loop.c        Main processing loop: inbound → context → LLM → outbound
+│   ├── agent_loop.c        ReAct loop: LLM call → tool execution → repeat
 │   ├── context_builder.h   System prompt + messages builder API
-│   └── context_builder.c   Reads bootstrap files + memory, assembles prompt
+│   └── context_builder.c   Reads bootstrap files + memory + tool guidance
+│
+├── tools/
+│   ├── tool_registry.h     Tool definition struct, register/dispatch API
+│   ├── tool_registry.c     Tool registration, JSON schema builder, dispatch by name
+│   ├── tool_web_search.h   Web search tool API
+│   └── tool_web_search.c   Brave Search API via HTTPS (direct + proxy)
 │
 ├── memory/
 │   ├── memory_store.h      Long-term + daily memory API
@@ -125,7 +144,7 @@ main/
 │
 ├── cli/
 │   ├── serial_cli.h        CLI init API
-│   └── serial_cli.c        esp_console REPL with 14 commands
+│   └── serial_cli.c        esp_console REPL with 15 commands
 │
 └── ota/
     ├── ota_manager.h       OTA update API
@@ -206,17 +225,20 @@ Session files are JSONL (one JSON object per line):
 
 ## NVS Configuration
 
-| Namespace     | Key          | Description                             |
-|---------------|--------------|-----------------------------------------|
-| `wifi_config` | `ssid`       | WiFi SSID                               |
-| `wifi_config` | `password`   | WiFi password                           |
-| `tg_config`   | `bot_token`  | Telegram Bot API token                  |
-| `llm_config`  | `api_key`    | Anthropic API key                       |
-| `llm_config`  | `model`      | Model ID (default: claude-opus-4-6) |
-| `proxy_config`| `host`       | HTTP proxy hostname/IP               |
-| `proxy_config`| `port`       | HTTP proxy port                      |
+| Namespace       | Key          | Description                             |
+|-----------------|--------------|-----------------------------------------|
+| `wifi_config`   | `ssid`       | WiFi SSID                               |
+| `wifi_config`   | `password`   | WiFi password                           |
+| `tg_config`     | `bot_token`  | Telegram Bot API token                  |
+| `llm_config`    | `api_key`    | Anthropic API key                       |
+| `llm_config`    | `model`      | Model ID (default: claude-opus-4-6)     |
+| `proxy_config`  | `host`       | HTTP proxy hostname/IP                  |
+| `proxy_config`  | `port`       | HTTP proxy port                         |
+| `search_config` | `api_key`    | Brave Search API key                    |
 
-All configured via Serial CLI commands: `wifi_set`, `set_tg_token`, `set_api_key`, `set_model`, `set_proxy`, `clear_proxy`.
+**Configuration priority**: `mimi_secrets.h` (build-time) > NVS (CLI-set) > defaults.
+
+All configurable via Serial CLI or build-time config file (`mimi_secrets.h`).
 
 ---
 
@@ -260,33 +282,50 @@ Client `chat_id` is auto-assigned on connection (`ws_<fd>`) but can be overridde
 
 Endpoint: `POST https://api.anthropic.com/v1/messages`
 
-Request format (Anthropic-native, not OpenAI):
+Request format (Anthropic-native, non-streaming, with tools):
 ```json
 {
   "model": "claude-opus-4-6",
   "max_tokens": 4096,
-  "stream": true,
   "system": "<system prompt>",
+  "tools": [
+    {
+      "name": "web_search",
+      "description": "Search the web for current information.",
+      "input_schema": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}
+    }
+  ],
   "messages": [
     {"role": "user", "content": "Hello"},
     {"role": "assistant", "content": "Hi!"},
-    {"role": "user", "content": "How are you?"}
+    {"role": "user", "content": "What's the weather today?"}
   ]
 }
 ```
 
 Key difference from OpenAI: `system` is a top-level field, not inside the `messages` array.
 
-SSE streaming response events:
+Non-streaming JSON response:
+```json
+{
+  "id": "msg_xxx",
+  "type": "message",
+  "role": "assistant",
+  "content": [
+    {"type": "text", "text": "Let me search for that."},
+    {"type": "tool_use", "id": "toolu_xxx", "name": "web_search", "input": {"query": "weather today"}}
+  ],
+  "stop_reason": "tool_use"
+}
 ```
-event: content_block_delta
-data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"Hello"}}
 
-event: message_stop
-data: {"type":"message_stop"}
+When `stop_reason` is `"tool_use"`, the agent loop executes each tool and sends results back:
+```json
+{"role": "assistant", "content": [<text + tool_use blocks>]}
+{"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_xxx", "content": "..."}]}
 ```
 
-The SSE parser in `llm_proxy.c` accumulates `text_delta` tokens into a response buffer.
+The loop repeats until `stop_reason` is `"end_turn"` (max 10 iterations).
 
 ---
 
@@ -301,13 +340,14 @@ app_main()
   ├── memory_store_init()           Verify SPIFFS paths
   ├── session_mgr_init()
   ├── wifi_manager_init()           Init WiFi STA mode + event handlers
-  ├── http_proxy_init()             Load proxy config from NVS
-  ├── telegram_bot_init()           Load bot token from NVS
-  ├── llm_proxy_init()              Load API key + model from NVS
+  ├── http_proxy_init()             Load proxy config (secrets > NVS)
+  ├── telegram_bot_init()           Load bot token (secrets > NVS)
+  ├── llm_proxy_init()              Load API key + model (secrets > NVS)
+  ├── tool_registry_init()          Register tools, build tools JSON
   ├── agent_loop_init()
   ├── serial_cli_init()             Start REPL (works without WiFi)
   │
-  ├── wifi_manager_start()          Connect using NVS credentials
+  ├── wifi_manager_start()          Connect (secrets > NVS credentials)
   │   └── wifi_manager_wait_connected(30s)
   │
   └── [if WiFi connected]
@@ -330,6 +370,7 @@ If WiFi credentials are missing or connection times out, the CLI remains availab
 | `set_tg_token <TOKEN>`         | Save Telegram bot token              |
 | `set_api_key <KEY>`            | Save Anthropic API key               |
 | `set_model <MODEL_ID>`         | Set LLM model identifier             |
+| `set_search_key <KEY>`         | Save Brave Search API key            |
 | `set_proxy <HOST> <PORT>`      | Set HTTP CONNECT proxy               |
 | `clear_proxy`                  | Remove proxy, use direct connection  |
 | `memory_read`                  | Print MEMORY.md contents             |
@@ -340,22 +381,24 @@ If WiFi credentials are missing or connection times out, the CLI remains availab
 | `restart`                      | Reboot the device                    |
 | `help`                         | List all available commands           |
 
+> **Note**: CLI-set values are stored in NVS but are overridden by `mimi_secrets.h` build-time values if set.
+
 ---
 
 ## Nanobot Reference Mapping
 
 | Nanobot Module              | MimiClaw Equivalent            | Notes                        |
 |-----------------------------|--------------------------------|------------------------------|
-| `agent/loop.py`             | `agent/agent_loop.c`           | Simplified: no tool use loop |
-| `agent/context.py`          | `agent/context_builder.c`      | Loads SOUL.md + USER.md + memory |
+| `agent/loop.py`             | `agent/agent_loop.c`           | ReAct loop with tool use     |
+| `agent/context.py`          | `agent/context_builder.c`      | Loads SOUL.md + USER.md + memory + tool guidance |
 | `agent/memory.py`           | `memory/memory_store.c`        | MEMORY.md + daily notes      |
 | `session/manager.py`        | `memory/session_mgr.c`         | JSONL per chat, ring buffer  |
 | `channels/telegram.py`      | `telegram/telegram_bot.c`      | Raw HTTP, no python-telegram-bot |
 | `bus/events.py` + `queue.py`| `bus/message_bus.c`            | FreeRTOS queues vs asyncio   |
 | `providers/litellm_provider.py` | `llm/llm_proxy.c`         | Direct Anthropic API only    |
-| `config/schema.py`          | `mimi_config.h` + NVS          | Compile-time + NVS storage   |
+| `config/schema.py`          | `mimi_config.h` + `mimi_secrets.h` + NVS | Build-time secrets > NVS |
 | `cli/commands.py`           | `cli/serial_cli.c`             | esp_console REPL             |
-| `agent/tools/*`             | *(not yet implemented)*        | See TODO.md                  |
+| `agent/tools/*`             | `tools/tool_registry.c` + `tool_web_search.c` | web_search via Brave API |
 | `agent/subagent.py`         | *(not yet implemented)*        | See TODO.md                  |
 | `agent/skills.py`           | *(not yet implemented)*        | See TODO.md                  |
 | `cron/service.py`           | *(not yet implemented)*        | See TODO.md                  |

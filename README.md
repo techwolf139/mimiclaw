@@ -62,13 +62,45 @@ git clone https://github.com/memovai/mimiclaw.git
 cd mimiclaw
 
 idf.py set-target esp32s3
+```
+
+### Configure
+
+**Option A: Config file (recommended)** — fill in once, baked into firmware at build time:
+
+```bash
+cp main/mimi_secrets.h.example main/mimi_secrets.h
+```
+
+Edit `main/mimi_secrets.h`:
+
+```c
+#define MIMI_SECRET_WIFI_SSID       "YourWiFiName"
+#define MIMI_SECRET_WIFI_PASS       "YourWiFiPassword"
+#define MIMI_SECRET_TG_TOKEN        "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
+#define MIMI_SECRET_API_KEY         "sk-ant-api03-xxxxx"
+#define MIMI_SECRET_SEARCH_KEY      ""              // optional: Brave Search API key
+#define MIMI_SECRET_PROXY_HOST      ""              // optional: e.g. "10.0.0.1"
+#define MIMI_SECRET_PROXY_PORT      ""              // optional: e.g. "7897"
+```
+
+Then build and flash:
+
+```bash
 idf.py build
 idf.py -p /dev/ttyACM0 flash monitor
 ```
 
-### Set Up
+Config file values have the **highest priority** — they override anything set via CLI.
 
-After flashing, a serial console appears. Type these commands:
+> **Note:** After editing `mimi_secrets.h`, run `touch main/mimi_config.h` before `idf.py build` to force recompilation.
+
+**Option B: Serial CLI** — configure at runtime after flashing:
+
+```bash
+idf.py build
+idf.py -p /dev/ttyACM0 flash monitor
+```
 
 ```
 mimi> wifi_set YourWiFiName YourWiFiPassword
@@ -77,20 +109,24 @@ mimi> set_api_key sk-ant-api03-xxxxx
 mimi> restart
 ```
 
-That's it. After restart, find your bot on Telegram and start chatting.
+CLI values are stored in NVS (persistent flash) and used when no config file value is set.
 
-### More Commands
+### CLI Commands
 
 ```
-mimi> wifi_status          # am I connected?
-mimi> set_model claude-opus-4-6   # use a different model
-mimi> set_proxy 10.0.0.1 7897     # optional: route through HTTP proxy
-mimi> clear_proxy          # optional: remove proxy, connect directly
-mimi> memory_read          # see what the bot remembers
-mimi> heap_info            # how much RAM is free?
-mimi> session_list         # list all chat sessions
-mimi> session_clear 12345  # wipe a conversation
-mimi> restart              # reboot
+mimi> wifi_set <ssid> <pass>   # set WiFi credentials
+mimi> wifi_status              # am I connected?
+mimi> set_tg_token <token>     # set Telegram bot token
+mimi> set_api_key <key>        # set Anthropic API key
+mimi> set_model claude-opus-4-6 # use a different model
+mimi> set_search_key <key>     # set Brave Search API key (for web_search tool)
+mimi> set_proxy 10.0.0.1 7897  # route through HTTP proxy
+mimi> clear_proxy              # remove proxy, connect directly
+mimi> memory_read              # see what the bot remembers
+mimi> heap_info                # how much RAM is free?
+mimi> session_list             # list all chat sessions
+mimi> session_clear 12345      # wipe a conversation
+mimi> restart                  # reboot
 ```
 
 ## Memory
@@ -105,12 +141,23 @@ MimiClaw stores everything as plain text files you can read and edit:
 | `2026-02-05.md` | Daily notes — what happened today |
 | `tg_12345.jsonl` | Chat history — your conversation with the bot |
 
+## Tools
+
+MimiClaw uses Anthropic's tool use protocol — Claude can call tools during a conversation and loop until the task is done (ReAct pattern).
+
+| Tool | Description |
+|------|-------------|
+| `web_search` | Search the web via Brave Search API for current information |
+
+To enable web search, set a [Brave Search API key](https://brave.com/search/api/) in your config file or via CLI (`set_search_key`).
+
 ## Also Included
 
 - **WebSocket gateway** on port 18789 — connect from your LAN with any WebSocket client
 - **OTA updates** — flash new firmware over WiFi, no USB needed
 - **Dual-core** — network I/O and AI processing run on separate CPU cores
 - **HTTP proxy** — CONNECT tunnel support for restricted networks
+- **Tool use** — ReAct agent loop with Anthropic tool use protocol
 
 ## For Developers
 
