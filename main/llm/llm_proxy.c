@@ -13,13 +13,12 @@
 
 static const char *TAG = "llm";
 
-#define LLM_API_KEY_MAX_LEN 256
+#define LLM_API_KEY_MAX_LEN 320
 #define LLM_MODEL_MAX_LEN   64
-#define LLM_PROVIDER_MAX_LEN 16
 
 static char s_api_key[LLM_API_KEY_MAX_LEN] = {0};
 static char s_model[LLM_MODEL_MAX_LEN] = MIMI_LLM_DEFAULT_MODEL;
-static char s_provider[LLM_PROVIDER_MAX_LEN] = MIMI_LLM_PROVIDER_DEFAULT;
+static char s_provider[16] = MIMI_LLM_PROVIDER_DEFAULT;
 
 static void safe_copy(char *dst, size_t dst_size, const char *src)
 {
@@ -28,7 +27,9 @@ static void safe_copy(char *dst, size_t dst_size, const char *src)
         dst[0] = '\0';
         return;
     }
-    snprintf(dst, dst_size, "%s", src);
+    size_t n = strnlen(src, dst_size - 1);
+    memcpy(dst, src, n);
+    dst[n] = '\0';
 }
 
 /* ── Response buffer ──────────────────────────────────────────── */
@@ -127,15 +128,12 @@ esp_err_t llm_proxy_init(void)
         if (nvs_get_str(nvs, MIMI_NVS_KEY_API_KEY, tmp, &len) == ESP_OK && tmp[0]) {
             safe_copy(s_api_key, sizeof(s_api_key), tmp);
         }
-        }
-
         char model_tmp[LLM_MODEL_MAX_LEN] = {0};
         len = sizeof(model_tmp);
         if (nvs_get_str(nvs, MIMI_NVS_KEY_MODEL, model_tmp, &len) == ESP_OK && model_tmp[0]) {
             safe_copy(s_model, sizeof(s_model), model_tmp);
         }
-
-        char provider_tmp[LLM_PROVIDER_MAX_LEN] = {0};
+        char provider_tmp[16] = {0};
         len = sizeof(provider_tmp);
         if (nvs_get_str(nvs, MIMI_NVS_KEY_PROVIDER, provider_tmp, &len) == ESP_OK && provider_tmp[0]) {
             safe_copy(s_provider, sizeof(s_provider), provider_tmp);
@@ -172,7 +170,7 @@ static esp_err_t llm_http_direct(const char *post_data, resp_buf_t *rb, int *out
     esp_http_client_set_header(client, "Content-Type", "application/json");
     if (provider_is_openai()) {
         if (s_api_key[0]) {
-            char auth[192];
+            char auth[LLM_API_KEY_MAX_LEN + 16];
             snprintf(auth, sizeof(auth), "Bearer %s", s_api_key);
             esp_http_client_set_header(client, "Authorization", auth);
         }
@@ -196,7 +194,7 @@ static esp_err_t llm_http_via_proxy(const char *post_data, resp_buf_t *rb, int *
     if (!conn) return ESP_ERR_HTTP_CONNECT;
 
     int body_len = strlen(post_data);
-    char header[512];
+    char header[1024];
     int hlen = 0;
     if (provider_is_openai()) {
         hlen = snprintf(header, sizeof(header),
