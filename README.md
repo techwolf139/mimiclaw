@@ -194,10 +194,6 @@ Technical details live in the `docs/` folder:
 
 Please read **[docs/CONTRIBUTE.md](docs/CONTRIBUTE.md)** before opening issues or pull requests.
 
-## Changelog
-
-See **[docs/CHANGELOG.md](docs/CHANGELOG.md)** for release notes and notable changes.
-
 ## License
 
 MIT

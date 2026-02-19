@@ -190,13 +190,9 @@ MimiClawにはcronスケジューラが内蔵されており、AIが自律的に
 - **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — システム設計、モジュール構成、タスクレイアウト、メモリバジェット、プロトコル、Flashパーティション
 - **[docs/TODO.md](docs/TODO.md)** — 機能ギャップとロードマップ
 
-## コントリビュート
+## Contributing
 
-Issue や PR の前に **[docs/CONTRIBUTE.md](docs/CONTRIBUTE.md)** を確認してください。
-
-## 変更履歴
-
-リリースノートと主な変更点は **[docs/CHANGELOG.md](docs/CHANGELOG.md)** を参照してください。
+Please read **[docs/CONTRIBUTE.md](docs/CONTRIBUTE.md)** before opening issues or pull requests.
 
 ## ライセンス
 
