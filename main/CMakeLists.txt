@@ -29,6 +29,7 @@ idf_component_register(
         "ui/ui_display.c"
         "ui/ui_touch.c"
         "ui/ui_state.c"
+        "ui/ui_sound.c"
     INCLUDE_DIRS
         "."
     REQUIRES
