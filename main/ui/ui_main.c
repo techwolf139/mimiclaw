@@ -21,15 +21,18 @@ static lv_display_t *disp;
 static bool ui_started = false;
 
 static void lv_tick_task(void *arg) {
-    lv_tick_inc(1);
+    lv_tick_inc(10);
 }
 
 static void ui_task(void *arg) {
     ESP_LOGI(TAG, "UI task started");
 
     while (1) {
-        vTaskDelay(pdMS_TO_TICKS(5));
-        lv_task_handler();
+        uint32_t task_delay = lv_timer_handler();
+        if (task_delay == 0) {
+            task_delay = 10;
+        }
+        vTaskDelay(pdMS_TO_TICKS(task_delay));
     }
 }
 
@@ -75,6 +78,8 @@ esp_err_t ui_init(void) {
 
     ui_state_init();
 
+    lv_init();
+
     ESP_ERROR_CHECK(ui_display_init());
 
     static lv_color_t *buf1 = NULL;
@@ -99,7 +104,7 @@ esp_err_t ui_init(void) {
 
     esp_timer_handle_t tick_timer;
     ESP_ERROR_CHECK(esp_timer_create(&tick_args, &tick_timer));
-    ESP_ERROR_CHECK(esp_timer_start_periodic(tick_timer, 1000));
+    ESP_ERROR_CHECK(esp_timer_start_periodic(tick_timer, 10000));
 
     create_main_screen();
 
