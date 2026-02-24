@@ -43,34 +43,32 @@ static void create_main_screen(void) {
     lv_obj_set_size(cont, 360, 360);
     lv_obj_set_pos(cont, 0, 0);
     lv_obj_set_flex_flow(cont, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(cont, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_bg_color(cont, lv_color_hex(0x000000), 0);
     lv_obj_set_style_bg_opa(cont, LV_OPA_COVER, 0);
+    lv_obj_set_style_pad_top(cont, 0, 0);
+    lv_obj_set_style_pad_bottom(cont, 0, 0);
 
     lv_obj_t *title = lv_label_create(cont);
     lv_label_set_text(title, "MimiClaw");
     lv_obj_set_style_text_color(title, lv_color_hex(0xFFFFFF), 0);
-    lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 20);
 
     lv_obj_t *wifi_label = lv_label_create(cont);
     lv_label_set_text(wifi_label, "WiFi: Connecting...");
     lv_obj_set_style_text_color(wifi_label, lv_color_hex(0x888888), 0);
-    lv_obj_align(wifi_label, LV_ALIGN_TOP_MID, 0, 60);
 
     lv_obj_t *msg_label = lv_label_create(cont);
     lv_label_set_text(msg_label, "Messages: 0");
     lv_obj_set_style_text_color(msg_label, lv_color_hex(0x888888), 0);
-    lv_obj_align(msg_label, LV_ALIGN_TOP_MID, 0, 85);
 
     lv_obj_t *uptime_label = lv_label_create(cont);
     lv_label_set_text(uptime_label, "Uptime: 00:00:00");
     lv_obj_set_style_text_color(uptime_label, lv_color_hex(0x888888), 0);
-    lv_obj_align(uptime_label, LV_ALIGN_TOP_MID, 0, 110);
 
     lv_obj_t *activity_label = lv_label_create(cont);
     lv_label_set_text(activity_label, "Activity:\n  Starting...");
     lv_obj_set_style_text_color(activity_label, lv_color_hex(0x888888), 0);
     lv_obj_set_width(activity_label, 300);
-    lv_obj_align(activity_label, LV_ALIGN_TOP_MID, 0, 150);
 }
 
 esp_err_t ui_init(void) {
