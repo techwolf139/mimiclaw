@@ -21,11 +21,13 @@
 #include "cli/serial_cli.h"
 #include "proxy/http_proxy.h"
 #include "tools/tool_registry.h"
+#include "tools/tool_web_search.h"
 #include "cron/cron_service.h"
 #include "heartbeat/heartbeat.h"
 #include "buttons/button_driver.h"
 #include "imu/imu_manager.h"
 #include "skills/skill_loader.h"
+#include "cJSON.h"
 
 static const char *TAG = "mimi";
 
@@ -95,6 +97,43 @@ static void outbound_dispatch_task(void *arg)
     }
 }
 
+static void auto_test_task(void *arg)
+{
+    vTaskDelay(pdMS_TO_TICKS(2000));
+
+    ESP_LOGI(TAG, "=== Auto Test: LLM ===");
+    llm_response_t resp = {0};
+    cJSON *msgs = cJSON_CreateArray();
+    cJSON *user_msg = cJSON_CreateObject();
+    cJSON_AddStringToObject(user_msg, "role", "user");
+    cJSON_AddStringToObject(user_msg, "content", "Hello, this is a test. Please reply with 'OK'.");
+    cJSON_AddItemToArray(msgs, user_msg);
+
+    esp_err_t err = llm_chat_tools("You are a helpful assistant.", msgs, NULL, &resp);
+    cJSON_Delete(msgs);
+
+    if (err == ESP_OK && resp.text) {
+        ESP_LOGI(TAG, "LLM response: %s", resp.text);
+    } else {
+        ESP_LOGE(TAG, "LLM test failed: %s", esp_err_to_name(err));
+    }
+    llm_response_free(&resp);
+
+    vTaskDelay(pdMS_TO_TICKS(1000));
+
+    ESP_LOGI(TAG, "=== Auto Test: Jina Search ===");
+    char search_output[512] = {0};
+    err = tool_web_search_execute("{\"query\": \"ESP32 S3\"}", search_output, sizeof(search_output));
+    if (err == ESP_OK) {
+        ESP_LOGI(TAG, "Jina search result: %s", search_output);
+    } else {
+        ESP_LOGE(TAG, "Jina search failed: %s", esp_err_to_name(err));
+    }
+
+    ESP_LOGI(TAG, "=== Auto Test Complete ===");
+    vTaskDelete(NULL);
+}
+
 void app_main(void)
 {
     /* Silence noisy components */
@@ -161,6 +200,8 @@ void app_main(void)
             ESP_ERROR_CHECK(ws_server_start());
 
             ESP_LOGI(TAG, "All services started!");
+
+            xTaskCreatePinnedToCore(auto_test_task, "auto_test", 8192, NULL, 3, NULL, 0);
         } else {
             ESP_LOGW(TAG, "WiFi connection timeout. Check MIMI_SECRET_WIFI_SSID in mimi_secrets.h");
         }
