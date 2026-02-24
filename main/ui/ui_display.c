@@ -7,6 +7,8 @@
 #include "esp_lcd_st77916.h"
 #include "driver/gpio.h"
 #include "driver/spi_master.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 static const char *TAG = "ui_display";
 
@@ -37,6 +39,17 @@ static bool is_initialized = false;
 #define LCD_V_RES           360
 #define LCD_PIXEL_CLOCK_HZ  (20 * 1000 * 1000)
 #define LCD_BIT_PER_PIXEL   16
+
+static const st77916_lcd_init_cmd_t st77916_init_cmds[] = {
+    {0xF0, (uint8_t[]){0x08}, 1, 0},
+    {0xF2, (uint8_t[]){0x08}, 1, 0},
+    {0x9B, (uint8_t[]){0x51}, 1, 0},
+    {0x86, (uint8_t[]){0x53}, 1, 0},
+    {0xF2, (uint8_t[]){0x82}, 1, 0},
+    {0xF0, (uint8_t[]){0x00}, 1, 0},
+    {0xF0, (uint8_t[]){0x01}, 1, 0},
+    {0xF1, (uint8_t[]){0x00}, 1, 0},
+};
 
 esp_err_t ui_display_init(void) {
     if (is_initialized) {
@@ -79,6 +92,8 @@ esp_err_t ui_display_init(void) {
     // Install ST77916 panel driver
     ESP_LOGI(TAG, "Install ST77916 panel driver");
     const st77916_vendor_config_t vendor_config = {
+        .init_cmds = st77916_init_cmds,
+        .init_cmds_size = sizeof(st77916_init_cmds) / sizeof(st77916_init_cmds[0]),
         .flags = {
             .use_qspi_interface = 1,
         },
@@ -93,7 +108,9 @@ esp_err_t ui_display_init(void) {
 
     // Reset and initialize the panel
     ESP_ERROR_CHECK(esp_lcd_panel_reset(panel_handle));
+    vTaskDelay(pdMS_TO_TICKS(50));
     ESP_ERROR_CHECK(esp_lcd_panel_init(panel_handle));
+    vTaskDelay(pdMS_TO_TICKS(50));
     
     // Turn on display
     ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(panel_handle, true));
