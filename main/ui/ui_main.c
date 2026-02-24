@@ -4,6 +4,7 @@
 #include "ui_display.h"
 #include "ui_touch.h"
 #include "ui_state.h"
+#include "ui_sound.h"
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
@@ -26,6 +27,24 @@ static lv_obj_t *msg_label = NULL;
 static lv_obj_t *uptime_label = NULL;
 static lv_obj_t *activity_label = NULL;
 static lv_obj_t *status_arc = NULL;
+static int click_count = 0;
+
+static void test_btn_clicked(lv_event_t *e) {
+    click_count++;
+    ESP_LOGI(TAG, "Button clicked! Count: %d", click_count);
+
+    ui_sound_beep(1000, 50);
+
+    lv_obj_t *btn = lv_event_get_target(e);
+    static bool btn_state = false;
+    btn_state = !btn_state;
+
+    if (btn_state) {
+        lv_obj_set_style_bg_color(btn, lv_color_hex(0x00FF88), 0);
+    } else {
+        lv_obj_set_style_bg_color(btn, lv_color_hex(0x00D4FF), 0);
+    }
+}
 
 static void lv_tick_task(void *arg) {
     lv_tick_inc(10);
@@ -62,7 +81,7 @@ static void create_main_screen(void) {
 
     // Title
     lv_obj_t *title = lv_label_create(cont);
-    lv_label_set_text(title, "MimiClaw");
+    lv_label_set_text(title, "EvoClaw");
     lv_obj_set_style_text_color(title, lv_color_hex(0x00D4FF), 0);
     lv_obj_set_style_text_font(title, &lv_font_montserrat_24, 0);
 
@@ -171,6 +190,19 @@ static void create_main_screen(void) {
     lv_obj_set_style_text_color(activity_label, lv_color_hex(0xFF66AA), 0);
     lv_obj_set_style_text_font(activity_label, &lv_font_montserrat_14, 0);
     lv_obj_align(activity_label, LV_ALIGN_BOTTOM_MID, 0, -2);
+
+    lv_obj_t *test_btn = lv_button_create(cont);
+    lv_obj_set_size(test_btn, 120, 40);
+    lv_obj_set_style_bg_color(test_btn, lv_color_hex(0x00D4FF), 0);
+    lv_obj_set_style_bg_opa(test_btn, LV_OPA_COVER, 0);
+    lv_obj_set_style_radius(test_btn, 20, 0);
+
+    lv_obj_t *test_label = lv_label_create(test_btn);
+    lv_label_set_text(test_label, "Touch Me");
+    lv_obj_set_style_text_color(test_label, lv_color_hex(0x000000), 0);
+    lv_obj_center(test_label);
+
+    lv_obj_add_event_cb(test_btn, test_btn_clicked, LV_EVENT_CLICKED, NULL);
 }
 
 esp_err_t ui_init(void) {
@@ -192,6 +224,11 @@ esp_err_t ui_init(void) {
     lv_display_set_buffers(disp, buf1, buf2, LCD_H_RES * LCD_DRAW_BUFF_HEIGHT * sizeof(lv_color_t), LV_DISPLAY_RENDER_MODE_PARTIAL);
     lv_display_set_flush_cb(disp, ui_display_flush);
     lv_display_set_rotation(disp, LV_DISPLAY_ROTATION_0);
+
+    ui_touch_init();  // Don't fail if touch init fails
+    ui_touch_register_lvgl_indev(disp);
+
+    ui_sound_init();
 
     lv_timer_handler();
 
