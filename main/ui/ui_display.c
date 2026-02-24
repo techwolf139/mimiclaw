@@ -35,7 +35,7 @@ static bool is_initialized = false;
 
 #define LCD_H_RES           360
 #define LCD_V_RES           360
-#define LCD_PIXEL_CLOCK_HZ  (40 * 1000 * 1000)
+#define LCD_PIXEL_CLOCK_HZ  (20 * 1000 * 1000)
 #define LCD_BIT_PER_PIXEL   16
 
 esp_err_t ui_display_init(void) {
@@ -85,7 +85,7 @@ esp_err_t ui_display_init(void) {
     };
     const esp_lcd_panel_dev_config_t panel_config = {
         .reset_gpio_num = LCD_PIN_RST,
-        .rgb_ele_order = LCD_RGB_ELEMENT_ORDER_RGB,
+        .rgb_ele_order = LCD_RGB_ELEMENT_ORDER_BGR,
         .bits_per_pixel = LCD_BIT_PER_PIXEL,
         .vendor_config = &vendor_config,
     };
