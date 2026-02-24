@@ -5,25 +5,36 @@
 
 static const char *TAG = "ui_touch";
 
-#define I2C_HOST I2C_NUM_0
-#define I2C_PIN_SDA 8
-#define I2C_PIN_SCL 9
+#define I2C_HOST         I2C_NUM_0
+#define I2C_PIN_SDA     GPIO_NUM_11
+#define I2C_PIN_SCL     GPIO_NUM_10
 
-#define CST816T_REG_STATUS    0x01
-#define CST816T_REG_X_POS_H   0x03
-#define CST816T_REG_X_POS_L   0x04
-#define CST816T_REG_Y_POS_H   0x05
-#define CST816T_REG_Y_POS_L   0x06
+#define CST816_I2C_ADDR     0x15
+#define CST816_REG_STATUS   0x01
+#define CST816_REG_X_H      0x03
+#define CST816_REG_X_L      0x04
+#define CST816_REG_Y_H      0x05
+#define CST816_REG_Y_L      0x06
 
 static bool is_initialized = false;
 static touch_callback_t user_callback = NULL;
+
+static esp_err_t cst816_read_reg(uint8_t reg_addr, uint8_t *data, size_t len) {
+    return i2c_master_write_read_device(
+        I2C_HOST, 
+        CST816_I2C_ADDR, 
+        &reg_addr, 1, 
+        data, len, 
+        pdMS_TO_TICKS(100)
+    );
+}
 
 esp_err_t ui_touch_init(void) {
     if (is_initialized) {
         return ESP_OK;
     }
 
-    ESP_LOGI(TAG, "Initializing CST816T touch controller");
+    ESP_LOGI(TAG, "Initializing CST816 touch controller");
 
     i2c_config_t conf = {
         .mode = I2C_MODE_MASTER,
@@ -31,15 +42,15 @@ esp_err_t ui_touch_init(void) {
         .scl_io_num = I2C_PIN_SCL,
         .sda_pullup_en = GPIO_PULLUP_ENABLE,
         .scl_pullup_en = GPIO_PULLUP_ENABLE,
-        .master.clk_speed = 100000,
+        .master.clk_speed = 400000,
     };
 
     ESP_ERROR_CHECK(i2c_param_config(I2C_HOST, &conf));
     ESP_ERROR_CHECK(i2c_driver_install(I2C_HOST, conf.mode, 0, 0, 0));
 
-    uint8_t check_addr = 0;
-    i2c_master_read_from_device(I2C_HOST, CST816T_I2C_ADDR, &check_addr, 1, pdMS_TO_TICKS(100));
-    ESP_LOGI(TAG, "CST816T touch controller initialized");
+    uint8_t chip_id = 0;
+    cst816_read_reg(0xA7, &chip_id, 1);
+    ESP_LOGI(TAG, "CST816 chip ID: 0x%02X", chip_id);
 
     is_initialized = true;
     return ESP_OK;
@@ -61,7 +72,7 @@ bool ui_touch_read(touch_point_t *point) {
     }
 
     uint8_t status = 0;
-    i2c_master_read_from_device(I2C_HOST, CST816T_I2C_ADDR, &status, 1, pdMS_TO_TICKS(10));
+    cst816_read_reg(CST816_REG_STATUS, &status, 1);
 
     if ((status & 0x80) == 0) {
         point->pressed = false;
@@ -69,7 +80,7 @@ bool ui_touch_read(touch_point_t *point) {
     }
 
     uint8_t data[4] = {0};
-    i2c_master_read_from_device(I2C_HOST, CST816T_I2C_ADDR, data, 4, pdMS_TO_TICKS(10));
+    cst816_read_reg(CST816_REG_X_H, data, 4);
 
     uint16_t x = ((data[0] & 0x0F) << 8) | data[1];
     uint16_t y = ((data[2] & 0x0F) << 8) | data[3];
