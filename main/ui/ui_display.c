@@ -285,7 +285,7 @@ esp_err_t ui_display_init(void) {
 
     ESP_LOGI(TAG, "Configure LCD rotation");
     esp_lcd_panel_swap_xy(panel_handle, true);
-    esp_lcd_panel_mirror(panel_handle, true, true);
+    esp_lcd_panel_mirror(panel_handle, false, true);
 
     ESP_LOGI(TAG, "LCD ST77916 initialized successfully");
 
