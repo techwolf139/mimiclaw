@@ -157,7 +157,15 @@ static const char *llm_api_host(void)
 
 static const char *llm_api_path(void)
 {
+    if (MIMI_SECRET_API_PATH[0] != '\0') {
+        return MIMI_SECRET_API_PATH;
+    }
     return provider_is_openai() ? "/v1/chat/completions" : "/v1/messages";
+}
+
+static bool use_custom_api(void)
+{
+    return MIMI_SECRET_API_URL[0] != '\0';
 }
 
 /* ── Init ─────────────────────────────────────────────────────── */
@@ -223,7 +231,13 @@ static esp_err_t llm_http_direct(const char *post_data, resp_buf_t *rb, int *out
 
     esp_http_client_set_method(client, HTTP_METHOD_POST);
     esp_http_client_set_header(client, "Content-Type", "application/json");
-    if (provider_is_openai()) {
+    if (use_custom_api()) {
+        if (s_api_key[0]) {
+            char auth[LLM_API_KEY_MAX_LEN + 16];
+            snprintf(auth, sizeof(auth), "Bearer %s", s_api_key);
+            esp_http_client_set_header(client, "Authorization", auth);
+        }
+    } else if (provider_is_openai()) {
         if (s_api_key[0]) {
             char auth[LLM_API_KEY_MAX_LEN + 16];
             snprintf(auth, sizeof(auth), "Bearer %s", s_api_key);
@@ -251,7 +265,7 @@ static esp_err_t llm_http_via_proxy(const char *post_data, resp_buf_t *rb, int *
     int body_len = strlen(post_data);
     char header[1024];
     int hlen = 0;
-    if (provider_is_openai()) {
+    if (use_custom_api() || provider_is_openai()) {
         hlen = snprintf(header, sizeof(header),
             "POST %s HTTP/1.1\r\n"
             "Host: %s\r\n"
