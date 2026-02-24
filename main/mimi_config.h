@@ -47,9 +47,6 @@
 #ifndef MIMI_SECRET_API_HOST
 #define MIMI_SECRET_API_HOST        ""
 #endif
-#ifndef MIMI_SECRET_API_PATH
-#define MIMI_SECRET_API_PATH        ""
-#endif
 
 /* WiFi */
 #define MIMI_WIFI_MAX_RETRY          10
