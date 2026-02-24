@@ -28,6 +28,7 @@
 #include "imu/imu_manager.h"
 #include "skills/skill_loader.h"
 #include "cJSON.h"
+#include "ui/ui_main.h"
 
 static const char *TAG = "mimi";
 
@@ -175,6 +176,10 @@ void app_main(void)
 
     /* Start Serial CLI first (works without WiFi) */
     ESP_ERROR_CHECK(serial_cli_init());
+
+    /* Initialize and start UI (display + touch) */
+    ESP_ERROR_CHECK(ui_init());
+    ESP_ERROR_CHECK(ui_start());
 
     /* Start WiFi */
     esp_err_t wifi_err = wifi_manager_start();

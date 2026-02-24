@@ -25,10 +25,14 @@ idf_component_register(
         "tools/tool_get_time.c"
         "tools/tool_files.c"
         "skills/skill_loader.c"
+        "ui/ui_main.c"
+        "ui/ui_display.c"
+        "ui/ui_touch.c"
+        "ui/ui_state.c"
     INCLUDE_DIRS
         "."
     REQUIRES
         nvs_flash esp_wifi esp_netif esp_http_client esp_http_server
         esp_https_ota esp_event json spiffs console vfs app_update esp-tls
-        driver esp_timer
+        driver esp_timer lvgl esp_lcd
 )
