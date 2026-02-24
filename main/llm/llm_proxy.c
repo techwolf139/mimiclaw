@@ -141,11 +141,17 @@ static bool provider_is_openai(void)
 
 static const char *llm_api_url(void)
 {
+    if (MIMI_SECRET_API_URL[0] != '\0') {
+        return MIMI_SECRET_API_URL;
+    }
     return provider_is_openai() ? MIMI_OPENAI_API_URL : MIMI_LLM_API_URL;
 }
 
 static const char *llm_api_host(void)
 {
+    if (MIMI_SECRET_API_HOST[0] != '\0') {
+        return MIMI_SECRET_API_HOST;
+    }
     return provider_is_openai() ? "api.openai.com" : "api.anthropic.com";
 }
 

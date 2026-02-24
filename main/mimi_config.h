@@ -35,6 +35,19 @@
 #define MIMI_SECRET_SEARCH_KEY      ""
 #endif
 
+/* Jina Search API (replaces Brave Search) */
+#ifndef MIMI_SECRET_JINA_KEY
+#define MIMI_SECRET_JINA_KEY        ""
+#endif
+
+/* Custom API Endpoint (leave empty to use default provider URLs) */
+#ifndef MIMI_SECRET_API_URL
+#define MIMI_SECRET_API_URL         ""
+#endif
+#ifndef MIMI_SECRET_API_HOST
+#define MIMI_SECRET_API_HOST        ""
+#endif
+
 /* WiFi */
 #define MIMI_WIFI_MAX_RETRY          10
 #define MIMI_WIFI_RETRY_BASE_MS      1000
