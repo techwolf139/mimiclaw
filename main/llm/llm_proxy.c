@@ -157,9 +157,6 @@ static const char *llm_api_host(void)
 
 static const char *llm_api_path(void)
 {
-    if (MIMI_SECRET_API_PATH[0] != '\0') {
-        return MIMI_SECRET_API_PATH;
-    }
     return provider_is_openai() ? "/v1/chat/completions" : "/v1/messages";
 }
 
