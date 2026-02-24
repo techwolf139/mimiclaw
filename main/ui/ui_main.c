@@ -5,6 +5,7 @@
 #include "ui_touch.h"
 #include "ui_state.h"
 #include "ui_sound.h"
+#include "ui_chat.h"
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
@@ -20,6 +21,10 @@ static const char *TAG = "ui_main";
 static TaskHandle_t ui_task_handle;
 static lv_display_t *disp;
 static bool ui_started = false;
+
+// Chat mode
+static bool chat_mode = false;
+static lv_obj_t *main_screen_cont = NULL;
 
 // UI Element references for updates
 static lv_obj_t *wifi_label = NULL;
@@ -43,6 +48,19 @@ static void test_btn_clicked(lv_event_t *e) {
         lv_obj_set_style_bg_color(btn, lv_color_hex(0x00FF88), 0);
     } else {
         lv_obj_set_style_bg_color(btn, lv_color_hex(0x00D4FF), 0);
+    }
+}
+
+static void chat_btn_clicked(lv_event_t *e) {
+    (void)e;
+    chat_mode = !chat_mode;
+    
+    if (chat_mode) {
+        lv_obj_add_flag(main_screen_cont, LV_OBJ_FLAG_HIDDEN);
+        ui_chat_show(true);
+    } else {
+        lv_obj_remove_flag(main_screen_cont, LV_OBJ_FLAG_HIDDEN);
+        ui_chat_show(false);
     }
 }
 
@@ -70,23 +88,23 @@ static void create_main_screen(void) {
     lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, 0);
 
     // Create main container
-    lv_obj_t *cont = lv_obj_create(scr);
-    lv_obj_set_size(cont, 360, 360);
-    lv_obj_set_pos(cont, 0, 0);
-    lv_obj_set_flex_flow(cont, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(cont, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_bg_opa(cont, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(cont, 0, 0);
-    lv_obj_set_style_pad_all(cont, 0, 0);
+    main_screen_cont = lv_obj_create(scr);
+    lv_obj_set_size(main_screen_cont, 360, 360);
+    lv_obj_set_pos(main_screen_cont, 0, 0);
+    lv_obj_set_flex_flow(main_screen_cont, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(main_screen_cont, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_bg_opa(main_screen_cont, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(main_screen_cont, 0, 0);
+    lv_obj_set_style_pad_all(main_screen_cont, 0, 0);
 
     // Title
-    lv_obj_t *title = lv_label_create(cont);
+    lv_obj_t *title = lv_label_create(main_screen_cont);
     lv_label_set_text(title, "EvoClaw");
     lv_obj_set_style_text_color(title, lv_color_hex(0x00D4FF), 0);
     lv_obj_set_style_text_font(title, &lv_font_montserrat_24, 0);
 
     // Status Circle (circular progress indicator)
-    lv_obj_t *circle_cont = lv_obj_create(cont);
+    lv_obj_t *circle_cont = lv_obj_create(main_screen_cont);
     lv_obj_set_size(circle_cont, 200, 200);
     lv_obj_set_style_bg_opa(circle_cont, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(circle_cont, 0, 0);
@@ -112,7 +130,7 @@ static void create_main_screen(void) {
     lv_obj_set_style_text_font(status_text, &lv_font_montserrat_14, 0);
 
     // Status indicators container
-    lv_obj_t *status_cont = lv_obj_create(cont);
+    lv_obj_t *status_cont = lv_obj_create(main_screen_cont);
     lv_obj_set_size(status_cont, 320, 80);
     lv_obj_set_style_bg_opa(status_cont, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(status_cont, 0, 0);
@@ -191,7 +209,8 @@ static void create_main_screen(void) {
     lv_obj_set_style_text_font(activity_label, &lv_font_montserrat_14, 0);
     lv_obj_align(activity_label, LV_ALIGN_BOTTOM_MID, 0, -2);
 
-    lv_obj_t *test_btn = lv_button_create(cont);
+    // Test button
+    lv_obj_t *test_btn = lv_button_create(main_screen_cont);
     lv_obj_set_size(test_btn, 120, 40);
     lv_obj_set_style_bg_color(test_btn, lv_color_hex(0x00D4FF), 0);
     lv_obj_set_style_bg_opa(test_btn, LV_OPA_COVER, 0);
@@ -203,6 +222,21 @@ static void create_main_screen(void) {
     lv_obj_center(test_label);
 
     lv_obj_add_event_cb(test_btn, test_btn_clicked, LV_EVENT_CLICKED, NULL);
+
+    // Chat button (toggle between main screen and chat view)
+    lv_obj_t *chat_btn = lv_button_create(main_screen_cont);
+    lv_obj_set_size(chat_btn, 50, 50);
+    lv_obj_set_style_bg_color(chat_btn, lv_color_hex(0x333333), 0);
+    lv_obj_set_style_radius(chat_btn, 25, 0);
+    lv_obj_set_pos(chat_btn, 295, 10);
+
+    lv_obj_t *chat_label = lv_label_create(chat_btn);
+    lv_label_set_text(chat_label, "C");
+    lv_obj_set_style_text_color(chat_label, lv_color_hex(0xFFFFFF), 0);
+    lv_obj_set_style_text_font(chat_label, &lv_font_montserrat_18, 0);
+    lv_obj_center(chat_label);
+
+    lv_obj_add_event_cb(chat_btn, chat_btn_clicked, LV_EVENT_CLICKED, NULL);
 }
 
 esp_err_t ui_init(void) {
@@ -229,6 +263,9 @@ esp_err_t ui_init(void) {
     ui_touch_register_lvgl_indev(disp);
 
     ui_sound_init();
+
+    // Initialize chat UI
+    ui_chat_init(disp);
 
     lv_timer_handler();
 

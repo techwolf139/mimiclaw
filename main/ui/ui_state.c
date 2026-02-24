@@ -58,3 +58,26 @@ void ui_state_update_touch(int16_t x, int16_t y, bool pressed) {
     g_ui_state.touch_y = y;
     g_ui_state.touch_pressed = pressed;
 }
+
+void ui_state_add_chat_message(const char *role, const char *content) {
+    if (!role || !content) return;
+    
+    // Use circular buffer index
+    int idx = g_ui_state.chat_msg_count % UI_CHAT_MAX_MESSAGES;
+    
+    ui_chat_msg_t *msg = &g_ui_state.chat_messages[idx];
+    snprintf(msg->role, sizeof(msg->role), "%s", role);
+    snprintf(msg->content, sizeof(msg->content), "%.255s", content);
+    msg->timestamp = g_ui_state.uptime_seconds;
+    
+    if (g_ui_state.chat_msg_count < UI_CHAT_MAX_MESSAGES) {
+        g_ui_state.chat_msg_count++;
+    }
+}
+
+void ui_state_clear_chat(void) {
+    g_ui_state.chat_msg_count = 0;
+    g_ui_state.chat_scroll_pos = 0;
+    g_ui_state.chat_active = false;
+    g_ui_state.receiving_response = false;
+}

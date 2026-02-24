@@ -29,6 +29,37 @@
 #include "skills/skill_loader.h"
 #include "cJSON.h"
 #include "ui/ui_main.h"
+#include "ui/ui_state.h"
+#include <string.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "esp_log.h"
+#include "esp_event.h"
+#include "esp_system.h"
+#include "esp_heap_caps.h"
+#include "esp_spiffs.h"
+#include "nvs_flash.h"
+
+#include "mimi_config.h"
+#include "bus/message_bus.h"
+#include "wifi/wifi_manager.h"
+#include "telegram/telegram_bot.h"
+#include "llm/llm_proxy.h"
+#include "agent/agent_loop.h"
+#include "memory/memory_store.h"
+#include "memory/session_mgr.h"
+#include "gateway/ws_server.h"
+#include "cli/serial_cli.h"
+#include "proxy/http_proxy.h"
+#include "tools/tool_registry.h"
+#include "tools/tool_web_search.h"
+#include "cron/cron_service.h"
+#include "heartbeat/heartbeat.h"
+#include "buttons/button_driver.h"
+#include "imu/imu_manager.h"
+#include "skills/skill_loader.h"
+#include "cJSON.h"
+#include "ui/ui_main.h"
 
 static const char *TAG = "mimi";
 static bool telegram_enabled = false;
@@ -74,7 +105,36 @@ static void outbound_dispatch_task(void *arg)
     while (1) {
         mimi_msg_t msg;
         if (message_bus_pop_outbound(&msg, UINT32_MAX) != ESP_OK) continue;
+        if (strcmp(msg.channel, MIMI_CHAN_TELEGRAM) == 0) {
+            if (!telegram_enabled) {
+                ESP_LOGW(TAG, "Telegram disabled, skipping message");
+                continue;
+            }
+            esp_err_t send_err = telegram_send_message(msg.chat_id, msg.content);
+            if (send_err != ESP_OK) {
+                ESP_LOGE(TAG, "Telegram send failed for %s: %s", msg.chat_id, esp_err_to_name(send_err));
+            } else {
+                ESP_LOGI(TAG, "Telegram send success for %s (%d bytes)", msg.chat_id, (int)strlen(msg.content));
+            }
+        } else if (strcmp(msg.channel, MIMI_CHAN_WEBSOCKET) == 0) {
+            esp_err_t ws_err = ws_server_send(msg.chat_id, msg.content);
+            if (ws_err != ESP_OK) {
+                ESP_LOGW(TAG, "WS send failed for %s: %s", msg.chat_id, esp_err_to_name(ws_err));
+            }
+        } else if (strcmp(msg.channel, MIMI_CHAN_SYSTEM) == 0) {
+            ESP_LOGI(TAG, "System message [%s]: %.128s", msg.chat_id, msg.content);
+        } else {
+            ESP_LOGW(TAG, "Unknown channel: %s", msg.channel);
+        }
 
+        // Update chat UI with assistant response
+        if (msg.content && strlen(msg.content) > 0) {
+            ui_state_add_chat_message("assistant", msg.content);
+        }
+
+        free(msg.content);
+    }
+}
         ESP_LOGI(TAG, "Dispatching response to %s:%s", msg.channel, msg.chat_id);
 
         if (strcmp(msg.channel, MIMI_CHAN_TELEGRAM) == 0) {

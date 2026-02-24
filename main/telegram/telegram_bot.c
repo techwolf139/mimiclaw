@@ -2,6 +2,12 @@
 #include "mimi_config.h"
 #include "bus/message_bus.h"
 #include "proxy/http_proxy.h"
+#include "ui/ui_state.h"
+
+#include <string.h>
+#include "mimi_config.h"
+#include "bus/message_bus.h"
+#include "proxy/http_proxy.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -354,6 +360,23 @@ static void process_updates(const char *json_str)
         }
 
         ESP_LOGI(TAG, "Message update_id=%" PRId64 " message_id=%d from chat %s: %.40s...",
+                 uid, msg_id_val, chat_id_str, text->valuestring);
+
+        // Update chat UI with user message
+        ui_state_add_chat_message("user", text->valuestring);
+
+        /* Push to inbound bus */
+        mimi_msg_t msg = {0};
+        strncpy(msg.channel, MIMI_CHAN_TELEGRAM, sizeof(msg.channel) - 1);
+        strncpy(msg.chat_id, chat_id_str, sizeof(msg.chat_id) - 1);
+        msg.content = strdup(text->valuestring);
+        if (msg.content) {
+            if (message_bus_push_inbound(&msg) != ESP_OK) {
+                ESP_LOGW(TAG, "Inbound queue full, drop telegram message");
+                free(msg.content);
+            }
+        }
+    }
                  uid, msg_id_val, chat_id_str, text->valuestring);
 
         /* Push to inbound bus */

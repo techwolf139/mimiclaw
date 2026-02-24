@@ -8,6 +8,17 @@
 extern "C" {
 #endif
 
+// Chat message constants
+#define UI_CHAT_MAX_MESSAGES 20
+#define UI_CHAT_MSG_MAX_LEN  256
+
+// Chat message structure
+typedef struct {
+    char role[16];           // "user" or "assistant"
+    char content[UI_CHAT_MSG_MAX_LEN];
+    uint32_t timestamp;
+} ui_chat_msg_t;
+
 // UI状态结构
 typedef struct {
     // WiFi状态
@@ -31,6 +42,15 @@ typedef struct {
     int16_t touch_x;
     int16_t touch_y;
     bool touch_pressed;
+    
+    // Chat messages
+    ui_chat_msg_t chat_messages[UI_CHAT_MAX_MESSAGES];
+    int chat_msg_count;
+    int chat_scroll_pos;
+    
+    // Chat state
+    bool chat_active;
+    bool receiving_response;
 } ui_state_t;
 
 // 全局UI状态
@@ -56,6 +76,10 @@ void ui_state_update_activity(const char *activity);
 
 // 更新触摸状态
 void ui_state_update_touch(int16_t x, int16_t y, bool pressed);
+
+// Chat message functions
+void ui_state_add_chat_message(const char *role, const char *content);
+void ui_state_clear_chat(void);
 
 #ifdef __cplusplus
 }
