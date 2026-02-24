@@ -525,13 +525,18 @@ esp_err_t llm_chat_tools(const char *system_prompt,
     /* Build request body (non-streaming) */
     cJSON *body = cJSON_CreateObject();
     cJSON_AddStringToObject(body, "model", s_model);
-    if (provider_is_openai()) {
+    if (provider_is_openai() || use_custom_api()) {
         cJSON_AddNumberToObject(body, "max_completion_tokens", MIMI_LLM_MAX_TOKENS);
     } else {
         cJSON_AddNumberToObject(body, "max_tokens", MIMI_LLM_MAX_TOKENS);
     }
 
-    if (provider_is_openai()) {
+    /* Add reasoning_split for MiniMax custom API */
+    if (use_custom_api()) {
+        cJSON_AddTrueToObject(body, "reasoning_split");
+    }
+
+    if (provider_is_openai() || use_custom_api()) {
         cJSON *openai_msgs = convert_messages_openai(system_prompt, messages);
         cJSON_AddItemToObject(body, "messages", openai_msgs);
 
@@ -601,7 +606,7 @@ esp_err_t llm_chat_tools(const char *system_prompt,
         return ESP_FAIL;
     }
 
-    if (provider_is_openai()) {
+    if (provider_is_openai() || use_custom_api()) {
         cJSON *choices = cJSON_GetObjectItem(root, "choices");
         cJSON *choice0 = choices && cJSON_IsArray(choices) ? cJSON_GetArrayItem(choices, 0) : NULL;
         if (choice0) {
@@ -612,6 +617,18 @@ esp_err_t llm_chat_tools(const char *system_prompt,
 
             cJSON *message = cJSON_GetObjectItem(choice0, "message");
             if (message) {
+                /* Handle reasoning_details for MiniMax (when reasoning_split=true) */
+                cJSON *reasoning_details = cJSON_GetObjectItem(message, "reasoning_details");
+                if (reasoning_details && cJSON_IsArray(reasoning_details)) {
+                    cJSON *reasoning;
+                    cJSON_ArrayForEach(reasoning, reasoning_details) {
+                        cJSON *text = cJSON_GetObjectItem(reasoning, "text");
+                        if (text && cJSON_IsString(text)) {
+                            ESP_LOGI(TAG, "Reasoning: %s", text->valuestring);
+                        }
+                    }
+                }
+
                 cJSON *content = cJSON_GetObjectItem(message, "content");
                 if (content && cJSON_IsString(content)) {
                     size_t tlen = strlen(content->valuestring);
