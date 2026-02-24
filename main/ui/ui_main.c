@@ -13,7 +13,7 @@
 static const char *TAG = "ui_main";
 
 #define UI_TASK_PRIORITY   4
-#define UI_TASK_STACK_SIZE 4096
+#define UI_TASK_STACK_SIZE 8192
 #define UI_TASK_CORE       1
 
 static TaskHandle_t ui_task_handle;
