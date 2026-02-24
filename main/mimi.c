@@ -29,6 +29,7 @@
 #include "ui/ui_main.h"
 
 static const char *TAG = "mimi";
+static bool telegram_enabled = false;
 
 static esp_err_t init_nvs(void)
 {
@@ -75,6 +76,10 @@ static void outbound_dispatch_task(void *arg)
         ESP_LOGI(TAG, "Dispatching response to %s:%s", msg.channel, msg.chat_id);
 
         if (strcmp(msg.channel, MIMI_CHAN_TELEGRAM) == 0) {
+            if (!telegram_enabled) {
+                ESP_LOGW(TAG, "Telegram disabled, skipping message");
+                continue;
+            }
             esp_err_t send_err = telegram_send_message(msg.chat_id, msg.content);
             if (send_err != ESP_OK) {
                 ESP_LOGE(TAG, "Telegram send failed for %s: %s", msg.chat_id, esp_err_to_name(send_err));
@@ -128,7 +133,15 @@ void app_main(void)
     ESP_ERROR_CHECK(session_mgr_init());
     ESP_ERROR_CHECK(wifi_manager_init());
     ESP_ERROR_CHECK(http_proxy_init());
-    ESP_ERROR_CHECK(telegram_bot_init());
+    
+    /* Initialize Telegram bot (optional - skip if no token configured) */
+    bool telegram_enabled = (telegram_bot_init() == ESP_OK);
+    if (telegram_enabled) {
+        ESP_LOGI(TAG, "Telegram bot enabled");
+    } else {
+        ESP_LOGI(TAG, "Telegram bot disabled (no token)");
+    }
+    
     ESP_ERROR_CHECK(llm_proxy_init());
     ESP_ERROR_CHECK(tool_registry_init());
     ESP_ERROR_CHECK(cron_service_init());
@@ -160,7 +173,9 @@ void app_main(void)
 
             /* Start network-dependent services */
             ESP_ERROR_CHECK(agent_loop_start());
-            ESP_ERROR_CHECK(telegram_bot_start());
+            if (telegram_enabled) {
+                ESP_ERROR_CHECK(telegram_bot_start());
+            }
             cron_service_start();
             heartbeat_start();
             ESP_ERROR_CHECK(ws_server_start());

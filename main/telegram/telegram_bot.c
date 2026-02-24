@@ -425,10 +425,11 @@ esp_err_t telegram_bot_init(void)
 
     if (s_bot_token[0]) {
         ESP_LOGI(TAG, "Telegram bot token loaded (len=%d)", (int)strlen(s_bot_token));
+        return ESP_OK;
     } else {
         ESP_LOGW(TAG, "No Telegram bot token. Use CLI: set_tg_token <TOKEN>");
+        return ESP_ERR_INVALID_STATE;
     }
-    return ESP_OK;
 }
 
 esp_err_t telegram_bot_start(void)
