@@ -52,6 +52,7 @@ static void create_main_screen(void) {
     lv_obj_t *title = lv_label_create(cont);
     lv_label_set_text(title, "MimiClaw");
     lv_obj_set_style_text_color(title, lv_color_hex(0xFFFFFF), 0);
+    lv_obj_set_style_text_font(title, &lv_font_montserrat_24, 0);
 
     lv_obj_t *wifi_label = lv_label_create(cont);
     lv_label_set_text(wifi_label, "WiFi: Connecting...");
