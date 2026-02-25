@@ -30,36 +30,34 @@
 #include "cJSON.h"
 #include "ui/ui_main.h"
 #include "ui/ui_state.h"
-#include <string.h>
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "esp_log.h"
-#include "esp_event.h"
-#include "esp_system.h"
-#include "esp_heap_caps.h"
-#include "esp_spiffs.h"
-#include "nvs_flash.h"
 
-#include "mimi_config.h"
-#include "bus/message_bus.h"
-#include "wifi/wifi_manager.h"
-#include "telegram/telegram_bot.h"
-#include "llm/llm_proxy.h"
-#include "agent/agent_loop.h"
-#include "memory/memory_store.h"
-#include "memory/session_mgr.h"
-#include "gateway/ws_server.h"
-#include "cli/serial_cli.h"
-#include "proxy/http_proxy.h"
-#include "tools/tool_registry.h"
-#include "tools/tool_web_search.h"
-#include "cron/cron_service.h"
-#include "heartbeat/heartbeat.h"
-#include "buttons/button_driver.h"
-#include "imu/imu_manager.h"
-#include "skills/skill_loader.h"
-#include "cJSON.h"
-#include "ui/ui_main.h"
+// Check if message contains error indicators - returns true if error
+static bool is_error_message(const char *content)
+{
+    if (!content) return true;
+
+    // Check for common error patterns
+    const char *error_patterns[] = {
+        "error", "Error", "ERROR",
+        "failed", "Failed", "FAILED",
+        "exception", "Exception", "EXCEPTION",
+        "cannot", "Cannot", "CANNOT",
+        "unable to", "Unable to", "UNABLE TO",
+        "no such", "No such", "NO SUCH",
+        "invalid", "Invalid", "INVALID",
+        "timeout", "Timeout", "TIMEOUT",
+        "denied", "Denied", "DENIED",
+        NULL
+    };
+
+    for (int i = 0; error_patterns[i] != NULL; i++) {
+        if (strstr(content, error_patterns[i]) != NULL) {
+            return true;
+        }
+    }
+
+    return false;
+}
 
 static const char *TAG = "mimi";
 static bool telegram_enabled = false;
@@ -105,6 +103,7 @@ static void outbound_dispatch_task(void *arg)
     while (1) {
         mimi_msg_t msg;
         if (message_bus_pop_outbound(&msg, UINT32_MAX) != ESP_OK) continue;
+
         if (strcmp(msg.channel, MIMI_CHAN_TELEGRAM) == 0) {
             if (!telegram_enabled) {
                 ESP_LOGW(TAG, "Telegram disabled, skipping message");
@@ -127,36 +126,9 @@ static void outbound_dispatch_task(void *arg)
             ESP_LOGW(TAG, "Unknown channel: %s", msg.channel);
         }
 
-        // Update chat UI with assistant response
-        if (msg.content && strlen(msg.content) > 0) {
+        // Update chat UI with assistant response (only if not error)
+        if (msg.content && strlen(msg.content) > 0 && !is_error_message(msg.content)) {
             ui_state_add_chat_message("assistant", msg.content);
-        }
-
-        free(msg.content);
-    }
-}
-        ESP_LOGI(TAG, "Dispatching response to %s:%s", msg.channel, msg.chat_id);
-
-        if (strcmp(msg.channel, MIMI_CHAN_TELEGRAM) == 0) {
-            if (!telegram_enabled) {
-                ESP_LOGW(TAG, "Telegram disabled, skipping message");
-                continue;
-            }
-            esp_err_t send_err = telegram_send_message(msg.chat_id, msg.content);
-            if (send_err != ESP_OK) {
-                ESP_LOGE(TAG, "Telegram send failed for %s: %s", msg.chat_id, esp_err_to_name(send_err));
-            } else {
-                ESP_LOGI(TAG, "Telegram send success for %s (%d bytes)", msg.chat_id, (int)strlen(msg.content));
-            }
-        } else if (strcmp(msg.channel, MIMI_CHAN_WEBSOCKET) == 0) {
-            esp_err_t ws_err = ws_server_send(msg.chat_id, msg.content);
-            if (ws_err != ESP_OK) {
-                ESP_LOGW(TAG, "WS send failed for %s: %s", msg.chat_id, esp_err_to_name(ws_err));
-            }
-        } else if (strcmp(msg.channel, MIMI_CHAN_SYSTEM) == 0) {
-            ESP_LOGI(TAG, "System message [%s]: %.128s", msg.chat_id, msg.content);
-        } else {
-            ESP_LOGW(TAG, "Unknown channel: %s", msg.channel);
         }
 
         free(msg.content);
@@ -232,15 +204,15 @@ void app_main(void)
     ESP_ERROR_CHECK(session_mgr_init());
     ESP_ERROR_CHECK(wifi_manager_init());
     ESP_ERROR_CHECK(http_proxy_init());
-    
+
     /* Initialize Telegram bot (optional - skip if no token configured) */
-    bool telegram_enabled = (telegram_bot_init() == ESP_OK);
-    if (telegram_enabled) {
+    bool tg_enabled = (telegram_bot_init() == ESP_OK);
+    if (tg_enabled) {
         ESP_LOGI(TAG, "Telegram bot enabled");
     } else {
         ESP_LOGI(TAG, "Telegram bot disabled (no token)");
     }
-    
+
     ESP_ERROR_CHECK(llm_proxy_init());
     ESP_ERROR_CHECK(tool_registry_init());
     ESP_ERROR_CHECK(cron_service_init());
@@ -262,6 +234,8 @@ void app_main(void)
         ESP_LOGI(TAG, "Waiting for WiFi connection...");
         if (wifi_manager_wait_connected(30000) == ESP_OK) {
             ESP_LOGI(TAG, "WiFi connected: %s", wifi_manager_get_ip());
+
+            telegram_enabled = tg_enabled;
 
             /* Outbound dispatch task should start first to avoid dropping early replies. */
             ESP_ERROR_CHECK((xTaskCreatePinnedToCore(

@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include "ui_main.h"
 #include "ui_display.h"
-#include "ui_touch.h"
 #include "ui_state.h"
 #include "ui_sound.h"
 #include "ui_chat.h"
@@ -32,24 +31,7 @@ static lv_obj_t *msg_label = NULL;
 static lv_obj_t *uptime_label = NULL;
 static lv_obj_t *activity_label = NULL;
 static lv_obj_t *status_arc = NULL;
-static int click_count = 0;
 
-static void test_btn_clicked(lv_event_t *e) {
-    click_count++;
-    ESP_LOGI(TAG, "Button clicked! Count: %d", click_count);
-
-    ui_sound_beep(1000, 50);
-
-    lv_obj_t *btn = lv_event_get_target(e);
-    static bool btn_state = false;
-    btn_state = !btn_state;
-
-    if (btn_state) {
-        lv_obj_set_style_bg_color(btn, lv_color_hex(0x00FF88), 0);
-    } else {
-        lv_obj_set_style_bg_color(btn, lv_color_hex(0x00D4FF), 0);
-    }
-}
 
 static void chat_btn_clicked(lv_event_t *e) {
     (void)e;
@@ -209,19 +191,6 @@ static void create_main_screen(void) {
     lv_obj_set_style_text_font(activity_label, &lv_font_montserrat_14, 0);
     lv_obj_align(activity_label, LV_ALIGN_BOTTOM_MID, 0, -2);
 
-    // Test button
-    lv_obj_t *test_btn = lv_button_create(main_screen_cont);
-    lv_obj_set_size(test_btn, 120, 40);
-    lv_obj_set_style_bg_color(test_btn, lv_color_hex(0x00D4FF), 0);
-    lv_obj_set_style_bg_opa(test_btn, LV_OPA_COVER, 0);
-    lv_obj_set_style_radius(test_btn, 20, 0);
-
-    lv_obj_t *test_label = lv_label_create(test_btn);
-    lv_label_set_text(test_label, "Touch Me");
-    lv_obj_set_style_text_color(test_label, lv_color_hex(0x000000), 0);
-    lv_obj_center(test_label);
-
-    lv_obj_add_event_cb(test_btn, test_btn_clicked, LV_EVENT_CLICKED, NULL);
 
     // Chat button (toggle between main screen and chat view)
     lv_obj_t *chat_btn = lv_button_create(main_screen_cont);
@@ -233,7 +202,7 @@ static void create_main_screen(void) {
     lv_obj_t *chat_label = lv_label_create(chat_btn);
     lv_label_set_text(chat_label, "C");
     lv_obj_set_style_text_color(chat_label, lv_color_hex(0xFFFFFF), 0);
-    lv_obj_set_style_text_font(chat_label, &lv_font_montserrat_18, 0);
+    lv_obj_set_style_text_font(chat_label, &lv_font_montserrat_14, 0);
     lv_obj_center(chat_label);
 
     lv_obj_add_event_cb(chat_btn, chat_btn_clicked, LV_EVENT_CLICKED, NULL);
@@ -259,8 +228,6 @@ esp_err_t ui_init(void) {
     lv_display_set_flush_cb(disp, ui_display_flush);
     lv_display_set_rotation(disp, LV_DISPLAY_ROTATION_0);
 
-    ui_touch_init();  // Don't fail if touch init fails
-    ui_touch_register_lvgl_indev(disp);
 
     ui_sound_init();
 

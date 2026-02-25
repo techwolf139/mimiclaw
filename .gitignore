@@ -47,3 +47,7 @@ nanobot/
 Thumbs.db
 references/
 ESP32-S3-Touch-LCD-1.85C-Test/*
+
+
+# Worktrees
+.worktrees/
