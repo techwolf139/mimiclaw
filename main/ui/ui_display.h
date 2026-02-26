@@ -11,7 +11,7 @@ extern "C" {
 
 #define LCD_H_RES  360
 #define LCD_V_RES  360
-#define LCD_DRAW_BUFF_HEIGHT 90
+    #define LCD_DRAW_BUFF_HEIGHT 18
 
 esp_err_t ui_display_init(void);
 esp_err_t ui_display_deinit(void);

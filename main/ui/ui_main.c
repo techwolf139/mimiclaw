@@ -79,6 +79,10 @@ static void create_main_screen(void) {
     lv_obj_set_style_border_width(main_screen_cont, 0, 0);
     lv_obj_set_style_pad_all(main_screen_cont, 0, 0);
 
+    // Round display mask - clip corners to create circular display
+    lv_obj_set_style_radius(main_screen_cont, 180, 0);
+    lv_obj_add_flag(main_screen_cont, LV_OBJ_FLAG_CLICKABLE);
+
     // Title
     lv_obj_t *title = lv_label_create(main_screen_cont);
     lv_label_set_text(title, "EvoClaw");
