@@ -1,10 +1,14 @@
 #include "audio_stream.h"
 #include "i2s_mic.h"
 #include "ws_client.h"
+#include "ui/ui_state.h"
+#include "ui/ui_chat.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include <stdbool.h>
+#include <string.h>
+#include <string.h>
 
 static const char *TAG = "audio_stream";
 static bool stream_running = false;
@@ -33,11 +37,7 @@ static void handshake_callback(bool done)
 
 static void mic_data_callback(const uint8_t *data, size_t len)
 {
-    ESP_LOGI(TAG, "[MIC] callback: conn=%d, handshake=%d, len=%d", 
-        ws_connected, ws_handshake_done, len);
-    
     if (!ws_connected || !ws_handshake_done) {
-        ESP_LOGW(TAG, "[MIC] Skipping, not ready: conn=%d, handshake=%d", ws_connected, ws_handshake_done);
         return;
     }
     
@@ -54,14 +54,47 @@ static void mic_data_callback(const uint8_t *data, size_t len)
     esp_err_t ret = ws_client_send_audio((const uint8_t *)pcm16, samples * 2);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "[MIC] Send failed: %d", ret);
-    } else {
-        ESP_LOGI(TAG, "[MIC] Sent %d bytes to ASR", samples * 2);
     }
 }
 
 static void text_result_callback(const char *text)
 {
-    ESP_LOGI(TAG, "[ASR] Result: %s", text);
+    char *json_str = strdup(text);
+    if (json_str == NULL) return;
+    
+    // Check if this is offline mode result
+    char *mode_start = strstr(json_str, "\"mode\":\"");
+    bool is_offline = false;
+    if (mode_start) {
+        mode_start += 7;
+        if (strncmp(mode_start, "offline", 7) == 0) {
+            is_offline = true;
+        }
+    }
+    
+    if (!is_offline) {
+        free(json_str);
+        return;
+    }
+    
+    // Extract text field
+    char *text_start = strstr(json_str, "\"text\":\"");
+    if (text_start) {
+        text_start += 8;
+        char *text_end = strstr(text_start, "\"");
+        if (text_end) {
+            *text_end = '\0';
+            ESP_LOGI(TAG, "[ASR] Recognized: %s", text_start);
+            
+            ui_state_add_chat_message("assistant", text_start);
+            g_ui_state.chat_active = true;
+            ui_chat_show(true);
+            ui_chat_update();
+            ui_chat_scroll_down();
+        }
+    }
+    
+    free(json_str);
 }
 
 esp_err_t audio_stream_init(const char *funasr_host, int funasr_port)

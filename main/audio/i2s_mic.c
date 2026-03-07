@@ -19,20 +19,12 @@ static void reader_task(void *arg)
 {
     size_t bytes_read = 0;
     uint8_t buffer[512];
-    int read_count = 0;
     
     while (is_running) {
         esp_err_t ret = i2s_channel_read(rx_handle, buffer, sizeof(buffer), &bytes_read, pdMS_TO_TICKS(100));
-        if (ret == ESP_OK && bytes_read > 0) {
-            read_count++;
-            if (read_count % 50 == 0) {
-                ESP_LOGI(TAG, "[I2S] Read %d bytes, callback=%p", bytes_read, data_callback);
-            }
-            if (data_callback) {
-                data_callback(buffer, bytes_read);
-            }
+        if (ret == ESP_OK && bytes_read > 0 && data_callback) {
+            data_callback(buffer, bytes_read);
         }
-        // Timeout (263) is expected when no new data
     }
     
     vTaskDelete(NULL);
