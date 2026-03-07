@@ -30,6 +30,7 @@
 #include "cJSON.h"
 #include "ui/ui_main.h"
 #include "ui/ui_state.h"
+#include "audio/audio_stream.h"
 
 // Check if message contains error indicators - returns true if error
 static bool is_error_message(const char *content)
@@ -234,6 +235,14 @@ void app_main(void)
         ESP_LOGI(TAG, "Waiting for WiFi connection...");
         if (wifi_manager_wait_connected(30000) == ESP_OK) {
             ESP_LOGI(TAG, "WiFi connected: %s", wifi_manager_get_ip());
+
+            /* Start ASR audio streaming if enabled */
+            #if MIMI_SECRET_FUNASR_ENABLED
+            ESP_LOGI(TAG, "Starting ASR audio streaming to %s:%d", 
+                      MIMI_SECRET_FUNASR_HOST, MIMI_SECRET_FUNASR_PORT);
+            ESP_ERROR_CHECK(audio_stream_init(MIMI_SECRET_FUNASR_HOST, MIMI_SECRET_FUNASR_PORT));
+            ESP_ERROR_CHECK(audio_stream_start());
+            #endif
 
             telegram_enabled = tg_enabled;
 

@@ -30,10 +30,13 @@ idf_component_register(
         "ui/ui_state.c"
         "ui/ui_sound.c"
         "ui/ui_chat.c"
+        "audio/i2s_mic.c"
+        "audio/ws_client.c"
+        "audio/audio_stream.c"
     INCLUDE_DIRS
         "."
     REQUIRES
         nvs_flash esp_wifi esp_netif esp_http_client esp_http_server
         esp_https_ota esp_event json spiffs console vfs app_update esp-tls
-        driver esp_timer lvgl esp_lcd
+        driver esp_timer lvgl esp_lcd esp_websocket_client
 )

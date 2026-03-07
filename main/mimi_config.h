@@ -40,6 +40,17 @@
 #define MIMI_SECRET_JINA_KEY        ""
 #endif
 
+/* FunASR Voice Recognition */
+#ifndef MIMI_SECRET_FUNASR_HOST
+#define MIMI_SECRET_FUNASR_HOST     "192.168.10.91"
+#endif
+#ifndef MIMI_SECRET_FUNASR_PORT
+#define MIMI_SECRET_FUNASR_PORT     10095
+#endif
+#ifndef MIMI_SECRET_FUNASR_ENABLED
+#define MIMI_SECRET_FUNASR_ENABLED  1
+#endif
+
 /* Custom API Endpoint (leave empty to use default provider URLs) */
 #ifndef MIMI_SECRET_API_URL
 #define MIMI_SECRET_API_URL         ""
