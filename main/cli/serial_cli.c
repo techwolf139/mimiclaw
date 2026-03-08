@@ -11,6 +11,7 @@
 #include "cron/cron_service.h"
 #include "heartbeat/heartbeat.h"
 #include "skills/skill_loader.h"
+#include "ui/sd_storage.h"
 
 #include <string.h>
 #include <stdio.h>
