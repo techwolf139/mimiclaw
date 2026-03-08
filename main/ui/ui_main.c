@@ -5,6 +5,7 @@
 #include "ui_state.h"
 #include "ui_sound.h"
 #include "ui_chat.h"
+#include "ui_subtitle.h"
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
@@ -31,6 +32,7 @@ static lv_obj_t *msg_label = NULL;
 static lv_obj_t *uptime_label = NULL;
 static lv_obj_t *activity_label = NULL;
 static lv_obj_t *status_arc = NULL;
+static lv_obj_t *status_text = NULL;
 
 
 static void chat_btn_clicked(lv_event_t *e) {
@@ -47,10 +49,10 @@ static void chat_btn_clicked(lv_event_t *e) {
 }
 
 static void lv_tick_task(void *arg) {
-    lv_tick_inc(10);
+    lv_tick_inc(2);
 }
-
-static void ui_task(void *arg) {
+static void ui_task(void *arg)
+{
     ESP_LOGI(TAG, "UI task started");
 
     while (1) {
@@ -58,6 +60,9 @@ static void ui_task(void *arg) {
         if (task_delay == 0) {
             task_delay = 10;
         }
+        
+        ui_subtitle_update();
+        
         vTaskDelay(pdMS_TO_TICKS(task_delay));
     }
 }
@@ -83,11 +88,11 @@ static void create_main_screen(void) {
     lv_obj_set_style_radius(main_screen_cont, 180, 0);
     lv_obj_add_flag(main_screen_cont, LV_OBJ_FLAG_CLICKABLE);
 
-    // Title
+    // Title - "Hand Mi" logo
     lv_obj_t *title = lv_label_create(main_screen_cont);
-    lv_label_set_text(title, "EvoClaw");
-    lv_obj_set_style_text_color(title, lv_color_hex(0x00D4FF), 0);
-    lv_obj_set_style_text_font(title, &lv_font_montserrat_24, 0);
+    lv_label_set_text(title, "Hand Mi");
+    lv_obj_set_style_text_color(title, lv_color_hex(0x00FF88), 0);
+    lv_obj_set_style_text_font(title, &lv_font_montserrat_14, 0);
 
     // Status Circle (circular progress indicator)
     lv_obj_t *circle_cont = lv_obj_create(main_screen_cont);
@@ -109,8 +114,8 @@ static void create_main_screen(void) {
     lv_obj_set_style_arc_width(status_arc, 8, LV_PART_MAIN);
     lv_obj_set_style_arc_width(status_arc, 8, LV_PART_INDICATOR);
 
-    // Center status text
-    lv_obj_t *status_text = lv_label_create(circle_cont);
+    // Center status text (shows "Ready" or ASR results)
+    status_text = lv_label_create(circle_cont);
     lv_label_set_text(status_text, "Ready");
     lv_obj_set_style_text_color(status_text, lv_color_hex(0xFFFFFF), 0);
     lv_obj_set_style_text_font(status_text, &lv_font_montserrat_14, 0);
@@ -237,6 +242,9 @@ esp_err_t ui_init(void) {
 
     // Initialize chat UI
     ui_chat_init(disp);
+    
+    // Initialize subtitle UI
+    ui_subtitle_init(disp);
 
     lv_timer_handler();
 
@@ -249,7 +257,7 @@ esp_err_t ui_init(void) {
 
     esp_timer_handle_t tick_timer;
     ESP_ERROR_CHECK(esp_timer_create(&tick_args, &tick_timer));
-    ESP_ERROR_CHECK(esp_timer_start_periodic(tick_timer, 10000));
+    ESP_ERROR_CHECK(esp_timer_start_periodic(tick_timer, 2 * 1000));
 
     create_main_screen();
 
@@ -276,4 +284,12 @@ esp_err_t ui_start(void) {
 
     ui_started = true;
     return ESP_OK;
+}
+
+void ui_main_set_status(const char *text)
+{
+    if (status_text == NULL || text == NULL) {
+        return;
+    }
+    lv_label_set_text(status_text, text);
 }
