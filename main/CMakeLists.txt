@@ -31,6 +31,7 @@ idf_component_register(
         "ui/ui_sound.c"
         "ui/ui_chat.c"
         "ui/ui_subtitle.c"
+        "ui/sd_card.c"
         "audio/i2s_mic.c"
         "audio/ws_client.c"
         "audio/audio_stream.c"
@@ -39,5 +40,5 @@ idf_component_register(
     REQUIRES
         nvs_flash esp_wifi esp_netif esp_http_client esp_http_server
         esp_https_ota esp_event json spiffs console vfs app_update esp-tls
-        driver esp_timer lvgl esp_lcd esp_websocket_client
+        driver esp_timer lvgl esp_lcd esp_websocket_client fatfs
 )

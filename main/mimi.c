@@ -30,6 +30,7 @@
 #include "cJSON.h"
 #include "ui/ui_main.h"
 #include "ui/ui_state.h"
+#include "ui/sd_card.h"
 #include "audio/audio_stream.h"
 
 // Check if message contains error indicators - returns true if error
@@ -197,6 +198,13 @@ void app_main(void)
     ESP_ERROR_CHECK(init_nvs());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     ESP_ERROR_CHECK(init_spiffs());
+
+    /* Initialize SD card */
+    if (sd_card_init() == ESP_OK) {
+        ESP_LOGI(TAG, "SD card initialized: %lu MB", sd_get_card_size());
+    } else {
+        ESP_LOGW(TAG, "SD card not available");
+    }
 
     /* Initialize subsystems */
     ESP_ERROR_CHECK(message_bus_init());
