@@ -30,6 +30,7 @@ idf_component_register(
         "ui/ui_state.c"
         "ui/ui_sound.c"
         "ui/ui_chat.c"
+        "ui/ui_subtitle.c"
         "audio/i2s_mic.c"
         "audio/ws_client.c"
         "audio/audio_stream.c"
