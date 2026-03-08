@@ -2,6 +2,8 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <stddef.h>
+#include "esp_err.h"
 
 #define SD_MOUNT_POINT "/sdcard"
 
@@ -66,5 +68,3 @@ esp_err_t sd_load_skills_from_sd(void);
 
 esp_err_t sd_backup_memory(void);
 esp_err_t sd_export_all(const char *export_path);
-
-extern uint32_t flash_size;

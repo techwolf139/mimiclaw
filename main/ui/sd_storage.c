@@ -11,6 +11,7 @@
 #include "driver/sdmmc_host.h"
 #include "esp_log.h"
 #include "esp_err.h"
+#include "esp_flash.h"
 #include "cJSON.h"
 
 static const char *TAG = "SD_STORAGE";
@@ -199,9 +200,10 @@ esp_err_t sd_storage_init(void)
     sdmmc_card_print_info(stdout, sd_card);
     ESP_LOGI(TAG, "SD card mounted at %s", mount_point);
     
-    if (esp_flash_get_physical_size(NULL, &flash_size) == ESP_OK) {
-        flash_size = flash_size / (1024 * 1024);
-        ESP_LOGI(TAG, "Flash size: %lu MB", flash_size);
+    uint32_t flash_size_local = 0;
+    if (esp_flash_get_physical_size(NULL, &flash_size_local) == ESP_OK) {
+        flash_size_local = flash_size_local / (1024 * 1024);
+        ESP_LOGI(TAG, "Flash size: %lu MB", flash_size_local);
     }
     
     sd_initialized = true;
@@ -386,7 +388,7 @@ esp_err_t sd_load_skills_from_sd(void)
             continue;
         }
         
-        char filepath[256];
+        char filepath[512];
         snprintf(filepath, sizeof(filepath), "%s/%s", skill_dir, entry->d_name);
         
         FILE *f = fopen(filepath, "r");
