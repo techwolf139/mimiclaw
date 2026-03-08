@@ -31,7 +31,7 @@ idf_component_register(
         "ui/ui_sound.c"
         "ui/ui_chat.c"
         "ui/ui_subtitle.c"
-        "ui/sd_card.c"
+        "ui/sd_storage.c"
         "audio/i2s_mic.c"
         "audio/ws_client.c"
         "audio/audio_stream.c"

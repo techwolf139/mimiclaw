@@ -1,0 +1,26 @@
+{
+  "recording_enabled": false,
+  "archive_enabled": false,
+  "skills_enabled": false,
+  "backup_enabled": false,
+  "export_enabled": false,
+  "recording": {
+    "enabled": false,
+    "record_on_start": false,
+    "max_file_size_mb": 100
+  },
+  "archive": {
+    "enabled": false,
+    "auto_archive": false,
+    "archive_interval_hours": 24
+  },
+  "skills": {
+    "enabled": false,
+    "scan_on_start": false
+  },
+  "backup": {
+    "enabled": false,
+    "auto_backup": false,
+    "backup_interval_hours": 24
+  }
+}
