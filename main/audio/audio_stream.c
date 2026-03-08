@@ -3,11 +3,11 @@
 #include "ws_client.h"
 #include "ui/ui_state.h"
 #include "ui/ui_chat.h"
+#include "ui/ui_main.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include <stdbool.h>
-#include <string.h>
 #include <string.h>
 
 static const char *TAG = "audio_stream";
@@ -91,6 +91,7 @@ static void text_result_callback(const char *text)
             ui_chat_show(true);
             ui_chat_update();
             ui_chat_scroll_down();
+            ui_main_set_status(text_start);
         }
     }
     
