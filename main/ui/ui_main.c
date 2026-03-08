@@ -235,7 +235,7 @@ esp_err_t ui_init(void) {
     disp = lv_display_create(LCD_H_RES, LCD_V_RES);
     lv_display_set_buffers(disp, buf1, buf2, LCD_H_RES * LCD_DRAW_BUFF_HEIGHT * sizeof(lv_color_t), LV_DISPLAY_RENDER_MODE_PARTIAL);
     lv_display_set_flush_cb(disp, ui_display_flush);
-    lv_display_set_rotation(disp, LV_DISPLAY_ROTATION_0);
+    lv_display_set_rotation(disp, LV_DISPLAY_ROTATION_270);
 
 
     ui_sound_init();
