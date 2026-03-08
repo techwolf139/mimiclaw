@@ -10,6 +10,7 @@ extern "C" {
 
 esp_err_t ui_init(void);
 esp_err_t ui_start(void);
+void ui_main_set_status(const char *text);
 
 #ifdef __cplusplus
 }
