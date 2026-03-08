@@ -248,8 +248,15 @@ void app_main(void)
             #if MIMI_SECRET_FUNASR_ENABLED
             ESP_LOGI(TAG, "Starting ASR audio streaming to %s:%d", 
                       MIMI_SECRET_FUNASR_HOST, MIMI_SECRET_FUNASR_PORT);
-            ESP_ERROR_CHECK(audio_stream_init(MIMI_SECRET_FUNASR_HOST, MIMI_SECRET_FUNASR_PORT));
-            ESP_ERROR_CHECK(audio_stream_start());
+            if (audio_stream_init(MIMI_SECRET_FUNASR_HOST, MIMI_SECRET_FUNASR_PORT) == ESP_OK) {
+                if (audio_stream_start() != ESP_OK) {
+                    ESP_LOGW(TAG, "ASR server unreachable, continuing without voice recognition");
+                } else {
+                    ESP_LOGI(TAG, "ASR audio streaming started");
+                }
+            } else {
+                ESP_LOGW(TAG, "ASR init failed, continuing without voice recognition");
+            }
             #endif
 
             telegram_enabled = tg_enabled;
