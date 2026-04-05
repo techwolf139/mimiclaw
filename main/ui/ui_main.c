@@ -1,13 +1,21 @@
 #include <string.h>
 #include <stdlib.h>
+#include <time.h>
 #include "ui_main.h"
 #include "ui_display.h"
+#include "screen_manager.h"
 #include "ui_state.h"
 #include "ui_sound.h"
 #include "ui_chat.h"
 #include "ui_subtitle.h"
+#include "config_screen.h"
+#include "ui_status.h"
+#include "ui_skills.h"
+#include "ui_music.h"
+#include "ui_reminder.h"
 #include "esp_log.h"
 #include "esp_timer.h"
+#include "esp_lcd_panel_ops.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "lvgl.h"
@@ -22,38 +30,18 @@ static TaskHandle_t ui_task_handle;
 static lv_display_t *disp;
 static bool ui_started = false;
 
-// Chat mode
-static bool chat_mode = false;
+static screen_manager_t *s_mgr = NULL;
 static lv_obj_t *main_screen_cont = NULL;
-
-// UI Element references for updates
-static lv_obj_t *wifi_label = NULL;
-static lv_obj_t *msg_label = NULL;
-static lv_obj_t *uptime_label = NULL;
-static lv_obj_t *activity_label = NULL;
-static lv_obj_t *status_arc = NULL;
 static lv_obj_t *status_text = NULL;
+static lv_obj_t *time_label = NULL;
+static lv_obj_t *date_label = NULL;
 
-
-static void chat_btn_clicked(lv_event_t *e) {
-    (void)e;
-    chat_mode = !chat_mode;
-    
-    if (chat_mode) {
-        lv_obj_add_flag(main_screen_cont, LV_OBJ_FLAG_HIDDEN);
-        ui_chat_show(true);
-    } else {
-        lv_obj_remove_flag(main_screen_cont, LV_OBJ_FLAG_HIDDEN);
-        ui_chat_show(false);
-    }
-}
-
-static void lv_tick_task(void *arg) {
-    lv_tick_inc(2);
-}
 static void ui_task(void *arg)
 {
     ESP_LOGI(TAG, "UI task started");
+
+    uint32_t status_tick = 0;
+    uint32_t time_tick = 0;
 
     while (1) {
         uint32_t task_delay = lv_timer_handler();
@@ -62,159 +50,157 @@ static void ui_task(void *arg)
         }
         
         ui_subtitle_update();
+
+        status_tick += task_delay;
+        if (status_tick >= 5000) {
+            status_tick = 0;
+            if (s_mgr && screen_manager_get_active(s_mgr) == SCREEN_STATUS) {
+                ui_status_update();
+            }
+        }
+
+        time_tick += task_delay;
+        if (time_tick >= 1000) {
+            time_tick = 0;
+            if (time_label != NULL) {
+                time_t now;
+                struct tm timeinfo;
+                time(&now);
+                localtime_r(&now, &timeinfo);
+                char time_str[16];
+                strftime(time_str, sizeof(time_str), "%H:%M", &timeinfo);
+                lv_label_set_text(time_label, time_str);
+                if (date_label) {
+                    char date_str[16];
+                    strftime(date_str, sizeof(date_str), "%m/%d", &timeinfo);
+                    lv_label_set_text(date_label, date_str);
+                }
+            }
+        }
         
         vTaskDelay(pdMS_TO_TICKS(task_delay));
     }
 }
 
+static void nav_btn_clicked(lv_event_t *e) {
+    screen_id_t screen_id = (screen_id_t)(uintptr_t)lv_event_get_user_data(e);
+    ESP_LOGI(TAG, "Navigation: screen %d", screen_id);
+    
+    if (s_mgr) {
+        if (screen_manager_get_active(s_mgr) == screen_id) {
+            screen_manager_hide_all(s_mgr);
+            lv_obj_clear_flag(main_screen_cont, LV_OBJ_FLAG_HIDDEN);
+            ui_chat_hide();
+            ui_status_hide();
+            ui_skills_hide();
+            ui_music_hide();
+            ui_reminder_hide();
+            if (status_text) lv_label_set_text(status_text, "Ready");
+        } else {
+            lv_obj_add_flag(main_screen_cont, LV_OBJ_FLAG_HIDDEN);
+            ui_chat_hide();
+            ui_status_hide();
+            ui_skills_hide();
+            ui_music_hide();
+            ui_reminder_hide();
+            screen_manager_show(s_mgr, screen_id);
+            
+            switch(screen_id) {
+                case SCREEN_CHAT:
+                    ui_chat_show();
+                    if (status_text) lv_label_set_text(status_text, "Chat");
+                    break;
+                case SCREEN_STATUS:
+                    ui_status_show();
+                    break;
+                case SCREEN_SKILLS:
+                    ui_skills_show();
+                    break;
+                case SCREEN_MUSIC:
+                    ui_music_show();
+                    break;
+                case SCREEN_REMINDER:
+                    ui_reminder_show();
+                    break;
+                default:
+                    break;
+            }
+        }
+    }
+}
+
 static void create_main_screen(void) {
     lv_obj_t *scr = lv_screen_active();
+    if (scr == NULL) return;
     
-    // Background
-    lv_obj_set_style_bg_color(scr, lv_color_hex(0x000000), 0);
+    lv_obj_set_style_bg_color(scr, lv_color_hex(0x0a0a0a), 0);
     lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, 0);
 
-    // Create main container
     main_screen_cont = lv_obj_create(scr);
+    if (main_screen_cont == NULL) return;
     lv_obj_set_size(main_screen_cont, 360, 360);
     lv_obj_set_pos(main_screen_cont, 0, 0);
-    lv_obj_set_flex_flow(main_screen_cont, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(main_screen_cont, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_bg_opa(main_screen_cont, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(main_screen_cont, 0, 0);
     lv_obj_set_style_pad_all(main_screen_cont, 0, 0);
-
-    // Round display mask - clip corners to create circular display
     lv_obj_set_style_radius(main_screen_cont, 180, 0);
-    lv_obj_add_flag(main_screen_cont, LV_OBJ_FLAG_CLICKABLE);
 
-    // Title - "Hand Mi" logo
-    lv_obj_t *title = lv_label_create(main_screen_cont);
-    lv_label_set_text(title, "Hand Mi");
-    lv_obj_set_style_text_color(title, lv_color_hex(0x00FF88), 0);
-    lv_obj_set_style_text_font(title, &lv_font_montserrat_14, 0);
+    status_text = lv_label_create(main_screen_cont);
+    if (status_text) {
+        lv_label_set_text(status_text, "Ready");
+        lv_obj_set_style_text_color(status_text, lv_color_hex(0xFF6666), 0);
+        lv_obj_set_style_text_font(status_text, &lv_font_montserrat_14, 0);
+        lv_obj_align(status_text, LV_ALIGN_CENTER, 0, -10);
+    }
 
-    // Status Circle (circular progress indicator)
-    lv_obj_t *circle_cont = lv_obj_create(main_screen_cont);
-    lv_obj_set_size(circle_cont, 200, 200);
-    lv_obj_set_style_bg_opa(circle_cont, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(circle_cont, 0, 0);
-    lv_obj_set_flex_flow(circle_cont, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(circle_cont, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    time_label = lv_label_create(main_screen_cont);
+    if (time_label) {
+        lv_label_set_text(time_label, "00:00");
+        lv_obj_set_style_text_color(time_label, lv_color_hex(0xFF8888), 0);
+        lv_obj_set_style_text_font(time_label, &lv_font_montserrat_14, 0);
+        lv_obj_align(time_label, LV_ALIGN_CENTER, 0, -45);
+    }
 
-    // Arc indicator
-    status_arc = lv_arc_create(circle_cont);
-    lv_obj_set_size(status_arc, 140, 140);
-    lv_arc_set_rotation(status_arc, 270);
-    lv_arc_set_bg_angles(status_arc, 0, 360);
-    lv_arc_set_value(status_arc, 0);
-    lv_obj_remove_flag(status_arc, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_set_style_arc_color(status_arc, lv_color_hex(0x333333), LV_PART_MAIN);
-    lv_obj_set_style_arc_color(status_arc, lv_color_hex(0x00D4FF), LV_PART_INDICATOR);
-    lv_obj_set_style_arc_width(status_arc, 8, LV_PART_MAIN);
-    lv_obj_set_style_arc_width(status_arc, 8, LV_PART_INDICATOR);
+    date_label = lv_label_create(main_screen_cont);
+    if (date_label) {
+        lv_label_set_text(date_label, "01/01");
+        lv_obj_set_style_text_color(date_label, lv_color_hex(0x888888), 0);
+        lv_obj_set_style_text_font(date_label, &lv_font_montserrat_14, 0);
+        lv_obj_align(date_label, LV_ALIGN_CENTER, 0, -25);
+    }
 
-    // Center status text (shows "Ready" or ASR results)
-    status_text = lv_label_create(circle_cont);
-    lv_label_set_text(status_text, "Ready");
-    lv_obj_set_style_text_color(status_text, lv_color_hex(0xFFFFFF), 0);
-    lv_obj_set_style_text_font(status_text, &lv_font_montserrat_14, 0);
-
-    // Status indicators container
-    lv_obj_t *status_cont = lv_obj_create(main_screen_cont);
-    lv_obj_set_size(status_cont, 320, 80);
-    lv_obj_set_style_bg_opa(status_cont, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(status_cont, 0, 0);
-    lv_obj_set_flex_flow(status_cont, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(status_cont, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-
-    // WiFi status
-    lv_obj_t *wifi_box = lv_obj_create(status_cont);
-    lv_obj_set_size(wifi_box, 90, 60);
-    lv_obj_set_style_bg_opa(wifi_box, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(wifi_box, 0, 0);
+    const char *nav_labels[] = {"Chat", "Status", "Skills", "Music", "Reminder"};
+    const uint32_t nav_colors[] = {0x00D4FF, 0xFFAA00, 0xFF66AA, 0x9966FF, 0xFF6666};
+    const screen_id_t nav_screens[] = {SCREEN_CHAT, SCREEN_STATUS, SCREEN_SKILLS, SCREEN_MUSIC, SCREEN_REMINDER};
     
-    lv_obj_t *wifi_icon = lv_label_create(wifi_box);
-    lv_label_set_text(wifi_icon, "W");
-    lv_obj_set_style_text_font(wifi_icon, &lv_font_montserrat_24, 0);
-    lv_obj_set_style_text_color(wifi_icon, lv_color_hex(0x00D4FF), 0);
-    lv_obj_align(wifi_icon, LV_ALIGN_TOP_MID, 0, 0);
+    int btn_width = 56;
+    int btn_height = 32;
+    int spacing = 8;
+    int total_width = 5 * btn_width + 4 * spacing;
+    int start_x = (360 - total_width) / 2;
+    int btn_y = 290;
     
-    wifi_label = lv_label_create(wifi_box);
-    lv_label_set_text(wifi_label, "Connecting");
-    lv_obj_set_style_text_color(wifi_label, lv_color_hex(0xFFAA00), 0);
-    lv_obj_set_style_text_font(wifi_label, &lv_font_montserrat_14, 0);
-    lv_obj_align(wifi_label, LV_ALIGN_BOTTOM_MID, 0, -2);
-
-    // Messages status
-    lv_obj_t *msg_box = lv_obj_create(status_cont);
-    lv_obj_set_size(msg_box, 90, 60);
-    lv_obj_set_style_bg_opa(msg_box, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(msg_box, 0, 0);
-    
-    lv_obj_t *msg_icon = lv_label_create(msg_box);
-    lv_label_set_text(msg_icon, "M");
-    lv_obj_set_style_text_font(msg_icon, &lv_font_montserrat_24, 0);
-    lv_obj_set_style_text_color(msg_icon, lv_color_hex(0x00FF88), 0);
-    lv_obj_align(msg_icon, LV_ALIGN_TOP_MID, 0, 0);
-    
-    msg_label = lv_label_create(msg_box);
-    lv_label_set_text(msg_label, "0");
-    lv_obj_set_style_text_color(msg_label, lv_color_hex(0x00FF88), 0);
-    lv_obj_set_style_text_font(msg_label, &lv_font_montserrat_14, 0);
-    lv_obj_align(msg_label, LV_ALIGN_BOTTOM_MID, 0, -2);
-
-    // Uptime status
-    lv_obj_t *time_box = lv_obj_create(status_cont);
-    lv_obj_set_size(time_box, 90, 60);
-    lv_obj_set_style_bg_opa(time_box, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(time_box, 0, 0);
-    
-    lv_obj_t *time_icon = lv_label_create(time_box);
-    lv_label_set_text(time_icon, "T");
-    lv_obj_set_style_text_font(time_icon, &lv_font_montserrat_24, 0);
-    lv_obj_set_style_text_color(time_icon, lv_color_hex(0xAAAAAA), 0);
-    lv_obj_align(time_icon, LV_ALIGN_TOP_MID, 0, 0);
-    
-    uptime_label = lv_label_create(time_box);
-    lv_label_set_text(uptime_label, "00:00");
-    lv_obj_set_style_text_color(uptime_label, lv_color_hex(0xAAAAAA), 0);
-    lv_obj_set_style_text_font(uptime_label, &lv_font_montserrat_14, 0);
-    lv_obj_align(uptime_label, LV_ALIGN_BOTTOM_MID, 0, -2);
-
-    // Activity status
-    lv_obj_t *act_box = lv_obj_create(status_cont);
-    lv_obj_set_size(act_box, 90, 60);
-    lv_obj_set_style_bg_opa(act_box, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(act_box, 0, 0);
-    
-    lv_obj_t *act_icon = lv_label_create(act_box);
-    lv_label_set_text(act_icon, "A");
-    lv_obj_set_style_text_font(act_icon, &lv_font_montserrat_24, 0);
-    lv_obj_set_style_text_color(act_icon, lv_color_hex(0xFF66AA), 0);
-    lv_obj_align(act_icon, LV_ALIGN_TOP_MID, 0, 0);
-    
-    activity_label = lv_label_create(act_box);
-    lv_label_set_text(activity_label, "Idle");
-    lv_obj_set_style_text_color(activity_label, lv_color_hex(0xFF66AA), 0);
-    lv_obj_set_style_text_font(activity_label, &lv_font_montserrat_14, 0);
-    lv_obj_align(activity_label, LV_ALIGN_BOTTOM_MID, 0, -2);
-
-
-    // Chat button (toggle between main screen and chat view)
-    lv_obj_t *chat_btn = lv_button_create(main_screen_cont);
-    lv_obj_set_size(chat_btn, 50, 50);
-    lv_obj_set_style_bg_color(chat_btn, lv_color_hex(0x333333), 0);
-    lv_obj_set_style_radius(chat_btn, 25, 0);
-    lv_obj_set_pos(chat_btn, 295, 10);
-
-    lv_obj_t *chat_label = lv_label_create(chat_btn);
-    lv_label_set_text(chat_label, "C");
-    lv_obj_set_style_text_color(chat_label, lv_color_hex(0xFFFFFF), 0);
-    lv_obj_set_style_text_font(chat_label, &lv_font_montserrat_14, 0);
-    lv_obj_center(chat_label);
-
-    lv_obj_add_event_cb(chat_btn, chat_btn_clicked, LV_EVENT_CLICKED, NULL);
+    for (int i = 0; i < 5; i++) {
+        lv_obj_t *btn = lv_button_create(main_screen_cont);
+        if (btn == NULL) continue;
+        lv_obj_set_size(btn, btn_width, btn_height);
+        lv_obj_set_pos(btn, start_x + i * (btn_width + spacing), btn_y);
+        lv_obj_set_style_bg_color(btn, lv_color_hex(0x1a1a1a), 0);
+        lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, 0);
+        lv_obj_set_style_radius(btn, 16, 0);
+        lv_obj_set_style_border_width(btn, 1, 0);
+        lv_obj_set_style_border_color(btn, lv_color_hex(nav_colors[i]), 0);
+        
+        lv_obj_t *label = lv_label_create(btn);
+        if (label) {
+            lv_label_set_text(label, nav_labels[i]);
+            lv_obj_set_style_text_color(label, lv_color_hex(nav_colors[i]), 0);
+            lv_obj_set_style_text_font(label, &lv_font_montserrat_14, 0);
+            lv_obj_align(label, LV_ALIGN_CENTER, 0, 0);
+        }
+        
+        lv_obj_add_event_cb(btn, nav_btn_clicked, LV_EVENT_CLICKED, (void *)(uintptr_t)nav_screens[i]);
+    }
 }
 
 esp_err_t ui_init(void) {
@@ -231,33 +217,39 @@ esp_err_t ui_init(void) {
 
     buf1 = heap_caps_malloc(LCD_H_RES * LCD_DRAW_BUFF_HEIGHT * sizeof(lv_color_t), MALLOC_CAP_SPIRAM);
     buf2 = heap_caps_malloc(LCD_H_RES * LCD_DRAW_BUFF_HEIGHT * sizeof(lv_color_t), MALLOC_CAP_SPIRAM);
+    
+    if (buf1 == NULL || buf2 == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate LVGL buffers");
+        return ESP_ERR_NO_MEM;
+    }
 
     disp = lv_display_create(LCD_H_RES, LCD_V_RES);
+    if (disp == NULL) {
+        ESP_LOGE(TAG, "Failed to create LVGL display");
+        return ESP_FAIL;
+    }
+    
     lv_display_set_buffers(disp, buf1, buf2, LCD_H_RES * LCD_DRAW_BUFF_HEIGHT * sizeof(lv_color_t), LV_DISPLAY_RENDER_MODE_PARTIAL);
     lv_display_set_flush_cb(disp, ui_display_flush);
     lv_display_set_rotation(disp, LV_DISPLAY_ROTATION_270);
-
+    lv_display_set_user_data(disp, ui_display_get_panel_handle());
 
     ui_sound_init();
 
-    // Initialize chat UI
-    ui_chat_init(disp);
-    
-    // Initialize subtitle UI
-    ui_subtitle_init(disp);
+    ESP_ERROR_CHECK(ui_chat_init(disp));
+    ESP_ERROR_CHECK(ui_status_init(disp));
+    ESP_ERROR_CHECK(ui_skills_init(disp));
+    ESP_ERROR_CHECK(ui_music_init(disp));
+    ESP_ERROR_CHECK(ui_reminder_init(disp));
+    ESP_ERROR_CHECK(ui_subtitle_init(disp));
 
     lv_timer_handler();
 
-    ESP_LOGI(TAG, "Creating LVGL tick timer");
-
-    esp_timer_create_args_t tick_args = {
-        .callback = &lv_tick_task,
-        .name = "lv_tick"
-    };
-
-    esp_timer_handle_t tick_timer;
-    ESP_ERROR_CHECK(esp_timer_create(&tick_args, &tick_timer));
-    ESP_ERROR_CHECK(esp_timer_start_periodic(tick_timer, 2 * 1000));
+    s_mgr = screen_manager_init(disp);
+    if (s_mgr == NULL) {
+        ESP_LOGE(TAG, "Failed to create screen manager");
+        return ESP_FAIL;
+    }
 
     create_main_screen();
 

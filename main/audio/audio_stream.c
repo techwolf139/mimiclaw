@@ -88,8 +88,7 @@ static void text_result_callback(const char *text)
             
             ui_state_add_chat_message("assistant", text_start);
             g_ui_state.chat_active = true;
-            ui_chat_show(true);
-            ui_chat_update();
+            ui_chat_show();
             ui_chat_scroll_down();
             ui_main_set_status(text_start);
         }

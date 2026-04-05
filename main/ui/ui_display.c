@@ -32,7 +32,11 @@ static bool is_initialized = false;
 #define LCD_V_RES           360
 #define LCD_BIT_PER_PIXEL   16
 
-    #define LCD_INIT_CLK_HZ     (80 * 1000 * 1000)
+esp_lcd_panel_handle_t ui_display_get_panel_handle(void) {
+    return panel_handle;
+}
+
+    #define LCD_INIT_CLK_HZ     (40 * 1000 * 1000)
 
 static const st77916_lcd_init_cmd_t vendor_specific_init[] = {
   {0xF0, (uint8_t []){0x28}, 1, 0},
@@ -283,9 +287,9 @@ esp_err_t ui_display_init(void) {
     ESP_ERROR_CHECK(esp_lcd_panel_init(panel_handle));
     ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(panel_handle, true));
 
-    ESP_LOGI(TAG, "Configure LCD rotation");
+    ESP_LOGI(TAG, "Configure LCD rotation - 270 deg");
     esp_lcd_panel_swap_xy(panel_handle, true);
-    esp_lcd_panel_mirror(panel_handle, true, false);
+    esp_lcd_panel_mirror(panel_handle, false, false);
 
     ESP_LOGI(TAG, "LCD ST77916 initialized successfully");
 

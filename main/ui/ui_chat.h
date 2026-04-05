@@ -10,8 +10,10 @@ extern "C" {
 #endif
 
 esp_err_t ui_chat_init(lv_display_t *disp);
+void ui_chat_destroy(void);
+void ui_chat_show(void);
+void ui_chat_hide(void);
 void ui_chat_update(void);
-void ui_chat_show(bool show);
 void ui_chat_scroll_down(void);
 
 #ifdef __cplusplus
