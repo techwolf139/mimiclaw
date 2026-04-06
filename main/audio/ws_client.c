@@ -2,6 +2,8 @@
 #include "esp_websocket_client.h"
 #include "esp_log.h"
 #include "string.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 
 static const char *TAG = "ws_client";
 static esp_websocket_client_handle_t client = NULL;
@@ -11,6 +13,19 @@ static ws_client_handshake_callback_t handshake_cb = NULL;
 static bool is_connected = false;
 static bool handshake_done = false;
 static char ws_uri[64];
+static SemaphoreHandle_t ws_status_mutex = NULL;
+
+#define WS_STATUS_LOCK() do { \
+    if (ws_status_mutex != NULL) { \
+        xSemaphoreTake(ws_status_mutex, portMAX_DELAY); \
+    } \
+} while (0)
+
+#define WS_STATUS_UNLOCK() do { \
+    if (ws_status_mutex != NULL) { \
+        xSemaphoreGive(ws_status_mutex); \
+    } \
+} while (0)
 
 static esp_err_t send_asr_config(void)
 {
@@ -26,7 +41,10 @@ static esp_err_t send_asr_config(void)
         return ESP_FAIL;
     }
     
+    WS_STATUS_LOCK();
     handshake_done = true;
+    WS_STATUS_UNLOCK();
+    
     if (handshake_cb) {
         handshake_cb(true);
     }
@@ -45,7 +63,9 @@ static esp_err_t send_asr_end(void)
         return ESP_FAIL;
     }
     
+    WS_STATUS_LOCK();
     handshake_done = false;
+    WS_STATUS_UNLOCK();
     return ESP_OK;
 }
 
@@ -55,8 +75,10 @@ static void ws_event_handler(void *handler_args, esp_event_base_t base, int32_t 
     switch (id) {
     case WEBSOCKET_EVENT_CONNECTED:
         ESP_LOGI(TAG, "[ASR] WebSocket connected to %s", ws_uri);
+        WS_STATUS_LOCK();
         is_connected = true;
         handshake_done = false;
+        WS_STATUS_UNLOCK();
         send_asr_config();
         if (on_connect_cb) {
             on_connect_cb(true);
@@ -67,8 +89,10 @@ static void ws_event_handler(void *handler_args, esp_event_base_t base, int32_t 
         if (data->data_len > 0 && data->data_ptr) {
             ESP_LOGE(TAG, "[ASR] Disconnect msg: %.*s", (int)data->data_len, (char *)data->data_ptr);
         }
+        WS_STATUS_LOCK();
         is_connected = false;
         handshake_done = false;
+        WS_STATUS_UNLOCK();
         if (on_connect_cb) {
             on_connect_cb(false);
         }
@@ -101,6 +125,14 @@ esp_err_t ws_client_init(const char *host, int port)
     snprintf(ws_uri, sizeof(ws_uri), "ws://%s:%d", host, port);
     ESP_LOGI(TAG, "[ASR] WebSocket URI: %s", ws_uri);
 
+    if (ws_status_mutex == NULL) {
+        ws_status_mutex = xSemaphoreCreateMutex();
+        if (ws_status_mutex == NULL) {
+            ESP_LOGE(TAG, "[ASR] Failed to create status mutex");
+            return ESP_FAIL;
+        }
+    }
+
     esp_websocket_client_config_t config = {
         .uri = ws_uri,
         .reconnect_timeout_ms = 30000,
@@ -126,7 +158,10 @@ esp_err_t ws_client_connect(void)
         return ESP_FAIL;
     }
 
+    WS_STATUS_LOCK();
     handshake_done = false;
+    WS_STATUS_UNLOCK();
+    
     esp_err_t ret = esp_websocket_client_start(client);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "[ASR] Failed to start WebSocket client: %d", ret);
@@ -185,10 +220,18 @@ esp_err_t ws_client_register_handshake_callback(ws_client_handshake_callback_t c
 
 bool ws_client_is_connected(void)
 {
-    return is_connected;
+    bool connected;
+    WS_STATUS_LOCK();
+    connected = is_connected;
+    WS_STATUS_UNLOCK();
+    return connected;
 }
 
 bool ws_client_is_handshake_done(void)
 {
-    return handshake_done;
+    bool done;
+    WS_STATUS_LOCK();
+    done = handshake_done;
+    WS_STATUS_UNLOCK();
+    return done;
 }

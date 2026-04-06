@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -55,6 +57,9 @@ typedef struct {
 
 // 全局UI状态
 extern ui_state_t g_ui_state;
+
+// UI状态互斥锁
+extern SemaphoreHandle_t g_ui_mutex;
 
 // 初始化UI状态
 void ui_state_init(void);

@@ -36,7 +36,7 @@ esp_lcd_panel_handle_t ui_display_get_panel_handle(void) {
     return panel_handle;
 }
 
-    #define LCD_INIT_CLK_HZ     (40 * 1000 * 1000)
+#define LCD_INIT_CLK_HZ       (40 * 1000 * 1000)
 
 static const st77916_lcd_init_cmd_t vendor_specific_init[] = {
   {0xF0, (uint8_t []){0x28}, 1, 0},

@@ -5,7 +5,7 @@
 
 static const char *TAG = "ui_chat";
 
-static lv_display_t *s_disp;
+
 static lv_obj_t *s_scroll_cont;
 static lv_obj_t *s_msg_container;
 static bool s_initialized = false;
@@ -29,7 +29,7 @@ esp_err_t ui_chat_init(lv_display_t *disp) {
         return ESP_ERR_INVALID_ARG;
     }
     
-    s_disp = disp;
+    
     
     ESP_LOGI(TAG, "Initializing chat UI");
     
@@ -94,7 +94,7 @@ void ui_chat_destroy(void) {
         s_scroll_cont = NULL;
     }
     
-    s_disp = NULL;
+    // Display handle not stored - using lv_screen_active()
     s_initialized = false;
     s_visible = false;
     

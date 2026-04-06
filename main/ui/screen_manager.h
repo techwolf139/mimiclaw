@@ -19,11 +19,29 @@ typedef enum {
     SCREEN_COUNT // Sentinel value
 } screen_id_t;
 
+// Animation types
+typedef enum {
+    SCREEN_TRANSITION_NONE = 0,
+    SCREEN_TRANSITION_FADE,
+    SCREEN_TRANSITION_SLIDE_RIGHT,
+    SCREEN_TRANSITION_SLIDE_LEFT,
+    SCREEN_TRANSITION_MAX
+} screen_transition_t;
+
+// Animation parameters structure
+typedef struct {
+    uint32_t duration_ms;
+    lv_anim_path_cb_t *path;
+} animation_params_t;
+
 // Screen manager structure
 typedef struct {
     lv_disp_t *disp;
     screen_id_t active_screen;
+    screen_id_t previous_screen;
+    screen_transition_t transition_type;
     bool initialized;
+    bool animating;
 } screen_manager_t;
 
 // API functions
@@ -60,6 +78,24 @@ void screen_manager_hide_all(screen_manager_t *mgr);
  * @return Screen ID or SCREEN_COUNT if invalid
  */
 screen_id_t screen_manager_get_active(screen_manager_t *mgr);
+
+/**
+ * Set the transition animation for screen changes
+ * @param mgr Screen manager instance
+ * @param transition Animation type
+ * @param duration_ms Animation duration in milliseconds
+ * @return ESP_OK on success, ESP_FAIL on error
+ */
+esp_err_t screen_manager_set_transition(screen_manager_t *mgr,
+                                        screen_transition_t transition,
+                                        uint32_t duration_ms);
+
+/**
+ * Check if screen manager is currently animating
+ * @param mgr Screen manager instance
+ * @return true if animation is in progress
+ */
+bool screen_manager_is_animating(screen_manager_t *mgr);
 
 #ifdef __cplusplus
 }

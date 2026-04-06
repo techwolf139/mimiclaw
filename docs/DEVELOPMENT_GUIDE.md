@@ -1,8 +1,29 @@
 # MimiClaw 开发指南
 
-> ESP32-S3 AI 助手固件 - C/FreeRTOS 裸机实现开发文档
+> ESP32-S3 AI 助手固件 - C/FreeRTOS 裸机实现开发文档  
+> **版本**: 2.0.0  
+> **最后更新**: 2026-04-06  
+> **维护状态**: ✅ 活跃维护
 
 ---
+
+## 文档索引
+
+本文档是 MimiClaw 项目的主要开发参考。所有相关文档链接请参见下方的 [参考资料](#参考资料) 和 [项目文档索引](#项目文档索引) 章节。
+
+### 📚 完整文档导航
+
+| 类型 | 文档 | 说明 |
+|------|------|------|
+| **核心文档** | [📄 PROJECT_SUMMARY.md](./PROJECT_SUMMARY.md) | 项目完整说明和元数据 |
+| **架构图集** | [📊 ARCHITECTURE_DIAGRAMS.md](./ARCHITECTURE_DIAGRAMS.md) | 6 个可视化架构图 |
+| **系统架构** | [📄 ARCHITECTURE.md](./ARCHITECTURE.md) | 详细系统架构设计 |
+| **功能清单** | [📄 FEATURES.md](./FEATURES.md) | 当前功能介绍 |
+| **路线图** | [📄 TODO.md](./TODO.md) | 待实现功能追踪 |
+| **UI/UX 设计** | [📝 docs/plans/](./plans/) | 多个设计文档 |
+
+---
+
 
 ## 项目概述
 
@@ -395,12 +416,120 @@ RSSI: -52 dBm
 
 ## 参考资料
 
+### 外部资源
+
 - [ESP-IDF 编程指南](https://docs.espressif.com/projects/esp-idf/)
 - [LVGL UI 库](https://docs.lvgl.io/)
 - [ST77916 LCD 数据手册](https://www.lcdwiki.com/ST77916_HD4308_1.8)
 - [Anthropic API 文档](https://docs.anthropic.com/claude/reference/getting-started-with-the-api)
+- [OpenClaw 项目](https://github.com/openclaw/openclaw)
+- [Nanobot 参考实现](https://github.com/HKUDS/nanobot)
+
+### 项目文档索引
+
+#### 📚 核心开发文档
+
+| 文档 | 描述 | 链接 |
+|------|------|------|
+| **README.md** | 项目主文档，快速开始 | [📄 docs/README.md](../README.md) |
+| **PROJECT_SUMMARY.md** | 项目完整说明和元数据 | [📄 docs/PROJECT_SUMMARY.md](./PROJECT_SUMMARY.md) |
+| **DEVELOPMENT_GUIDE.md** | 开发指南（本文件） | [📄 docs/DEVELOPMENT_GUIDE.md](./DEVELOPMENT_GUIDE.md) |
+| **ARCHITECTURE.md** | 系统架构设计文档 | [📄 docs/ARCHITECTURE.md](./ARCHITECTURE.md) |
+| **ARCHITECTURE_DIAGRAMS.md** | 6 个可视化架构图 | [📊 docs/ARCHITECTURE_DIAGRAMS.md](./ARCHITECTURE_DIAGRAMS.md) |
+
+#### 📋 功能与设计文档
+
+| 文档 | 描述 | 链接 |
+|------|------|------|
+| **FEATURES.md** | 功能清单 | [📄 docs/FEATURES.md](./FEATURES.md) |
+| **FEATURES_CN.md** | 功能清单（中文） | [📄 docs/FEATURES_CN.md](./FEATURES_CN.md) |
+| **TODO.md** | 功能路线图和差距追踪 | [📄 docs/TODO.md](./TODO.md) |
+| **INSTALL_MACOS.md** | macOS 安装指南 | [📄 docs/INSTALL_MACOS.md](./INSTALL_MACOS.md) |
+
+#### 📝 UI/UX 设计文档
+
+| 文档 | 描述 | 链接 |
+|------|------|------|
+| **2026-03-07-ui-redesign.md** | UI 重设计计划 | [📄 docs/plans/2026-04-05-ui-redesign.md](./plans/2026-04-05-ui-redesign.md) |
+| **2026-03-07-funasr-voice-streaming.md** | FunASR 语音流集成 | [📄 docs/plans/2026-03-07-funasr-voice-streaming.md](./plans/2026-03-07-funasr-voice-streaming.md) |
+| **2026-02-26-display-driver-improvement.md** | 显示驱动改进 | [📄 docs/plans/2026-02-26-display-driver-improvement.md](./plans/2026-02-26-display-driver-improvement.md) |
+| **2026-02-25-llm-chat-round-display.md** | LLM 聊天圆形显示器 | [📄 docs/plans/2026-02-25-llm-chat-round-display.md](./plans/2026-02-25-llm-chat-round-display.md) |
+| **2026-02-24-lvgl-round-display-design.md** | LVGL 圆屏设计 | [📄 docs/plans/2026-02-24-lvgl-round-display-design.md](./plans/2026-02-24-lvgl-round-display-design.md) |
+
+#### 🔬 测试文档
+
+| 文档 | 描述 | 链接 |
+|------|------|------|
+| **UI_REDESIGN_TEST_PLAN.md** | UI 重设计测试计划 | [📄 docs/testing/UI_REDESIGN_TEST_PLAN.md](./testing/UI_REDESIGN_TEST_PLAN.md) |
 
 ---
+
+## 快速导航
+
+### 按开发阶段选择文档
+
+#### 🚀 开始开发前
+
+1. **阅读 README.md** - 了解项目背景
+2. **查看 PROJECT_SUMMARY.md** - 获取完整项目概览
+3. **浏览 ARCHITECTURE_DIAGRAMS.md** - 理解架构设计
+
+#### 🛠️ 开始写代码
+
+4. **阅读 DEVELOPMENT_GUIDE.md** - 开发环境和构建流程
+5. **查看 ARCHITECTURE.md** - 详细系统架构
+6. **参考 FEATURES.md** - 了解当前功能状态
+
+#### 📐 设计新特性
+
+7. **查看 TODO.md** - 避免重复实现
+8. **参考 UI/UX 设计文档** - 了解已有设计
+9. **阅读功能设计计划** - 学习设计决策
+
+#### 🎨 调试和维护
+
+10. **参考调试技巧** - 定位问题
+11. **查看测试文档** - 验证功能
+
+---
+
+## 文档维护指南
+
+本文档使用 Markdown 格式，建议：
+
+- **更新频率**：每月或重大发布后更新
+- **版本标记**：在文档开头添加 `版本：X.Y` 和 `最后更新：YYYY-MM-DD`
+- **链接检查**：定期验证所有链接的有效性
+- **格式规范**：使用统一的标题层级和语法高亮
+
+### 文档结构标准
+
+```markdown
+# 标题
+
+> 副标题 - 简短描述
+
+---
+
+## 章节 1
+内容...
+
+## 章节 2
+内容...
+
+---
+
+## 最后更新：YYYY-MM-DD
+```
+
+### 链接命名规范
+
+- 使用相对链接：`[链接文本](./filename.md)`
+- GIF 图标标识：`📄 文件名` (文档), `📊 文件名` (图表), `🔧 文件名` (配置)
+- 链接类型：内部分 `./file.md`，外部 `https://...`
+
+---
+
 
 ## 故障排除
 

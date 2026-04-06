@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MimiClaw | Vault-Tec Terminal</title>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+    <style>
+        :root {
+            --green: #00FF41;
+            --amber: #FFB000;
+            --bg: #050505;
+            --scanline: rgba(0, 255, 65, 0.04);
+            --glow: 0 0 10px var(--green), 0 0 20px var(--green);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--green);
+            font-family: 'VT323', monospace;
+            overflow-x: hidden;
+            font-size: 1.2rem;
+            line-height: 1.5;
+        }
+
+        /* CRT Effects */
+        .crt::before {
+            content: " ";
+            display: block;
+            position: fixed;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            right: 0;
+            background: linear-gradient(
+                to bottom,
+                rgba(18, 16, 16, 0) 50%,
+                rgba(0, 0, 0, 0.25) 50%
+            );
+            background-size: 100% 4px;
+            z-index: 999;
+            pointer-events: none;
+        }
+
+        .crt::after {
+            content: " ";
+            display: block;
+            position: fixed;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            right: 0;
+            background: rgba(18, 16, 16, 0.1);
+            opacity: 0;
+            z-index: 999;
+            pointer-events: none;
+            animation: flicker 0.15s infinite;
+        }
+
+        @keyframes flicker {
+            0% { opacity: 0.027; }
+            5% { opacity: 0.03; }
+            10% { opacity: 0.02; }
+            15% { opacity: 0.04; }
+            20% { opacity: 0.02; }
+            25% { opacity: 0.03; }
+            30% { opacity: 0.02; }
+            35% { opacity: 0.04; }
+            40% { opacity: 0.02; }
+            45% { opacity: 0.03; }
+            50% { opacity: 0.02; }
+            55% { opacity: 0.04; }
+            60% { opacity: 0.02; }
+            65% { opacity: 0.03; }
+            70% { opacity: 0.02; }
+            75% { opacity: 0.04; }
+            80% { opacity: 0.02; }
+            85% { opacity: 0.03; }
+            90% { opacity: 0.02; }
+            95% { opacity: 0.04; }
+            100% { opacity: 0.02; }
+        }
+
+        /* Layout */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        section {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            border-bottom: 2px dashed var(--green);
+            position: relative;
+        }
+
+        h1, h2, h3 {
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        h1 {
+            font-size: 5rem;
+            text-shadow: var(--glow);
+            margin-bottom: 1rem;
+        }
+
+        h2 {
+            font-size: 3rem;
+            color: var(--amber);
+            margin-bottom: 2rem;
+            border-left: 5px solid var(--amber);
+            padding-left: 1rem;
+        }
+
+        p {
+            margin-bottom: 1.5rem;
+            max-width: 800px;
+        }
+
+        /* Hero */
+        #hero {
+            text-align: center;
+            align-items: center;
+        }
+
+        #hero .logo {
+            font-size: 8rem;
+            margin-bottom: 0;
+            transform: scale(0);
+        }
+
+        #hero .tagline {
+            font-size: 2rem;
+            color: var(--amber);
+            opacity: 0;
+        }
+
+        #hero .subtitle {
+            font-size: 1.5rem;
+            opacity: 0;
+            margin-top: 2rem;
+            border: 1px solid var(--green);
+            padding: 1rem 2rem;
+            display: inline-block;
+        }
+
+        /* Architecture */
+        .layer {
+            background: rgba(0, 255, 65, 0.05);
+            border: 1px solid var(--green);
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            opacity: 0;
+            transform: translateX(-50px);
+        }
+
+        .layer h3 {
+            color: var(--amber);
+            margin-bottom: 0.5rem;
+        }
+
+        /* Features */
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+        }
+
+        .feature-card {
+            border: 2px solid var(--green);
+            padding: 2rem;
+            background: rgba(0, 255, 65, 0.02);
+            transition: all 0.3s ease;
+            opacity: 0;
+            transform: translateY(30px);
+        }
+
+        .feature-card:hover {
+            background: rgba(0, 255, 65, 0.1);
+            box-shadow: var(--glow);
+            transform: translateY(-5px);
+        }
+
+        .feature-card h3 {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            color: var(--amber);
+        }
+
+        /* Tech Specs */
+        .terminal-window {
+            background: #000;
+            border: 2px solid var(--green);
+            padding: 2rem;
+            font-family: 'Courier New', monospace;
+            box-shadow: 0 0 15px var(--green);
+            height: 60vh;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .terminal-content {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 2rem;
+        }
+
+        .spec-line {
+            margin-bottom: 0.5rem;
+            opacity: 0;
+        }
+
+        .spec-key {
+            color: var(--amber);
+        }
+
+        /* Footer */
+        #footer {
+            min-height: 50vh;
+            text-align: center;
+            align-items: center;
+            border-bottom: none;
+        }
+
+        #footer .vault-tec {
+            font-size: 3rem;
+            color: var(--amber);
+            margin-bottom: 1rem;
+        }
+
+        #footer .disclaimer {
+            font-size: 0.9rem;
+            opacity: 0.7;
+            max-width: 600px;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--green);
+            border-radius: 5px;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            h1 { font-size: 3rem; }
+            h2 { font-size: 2rem; }
+            #hero .logo { font-size: 5rem; }
+        }
+    </style>
+</head>
+<body class="crt">
+    <div class="container">
+        <!-- Hero Section -->
+        <section id="hero">
+            <div class="logo">MimiClaw</div>
+            <div class="tagline">The world's first AI assistant on a $5 chip.</div>
+            <div class="subtitle">No Linux. No Node.js. Just pure C.</div>
+        </section>
+
+        <!-- Architecture Section -->
+        <section id="architecture">
+            <h2>System Architecture</h2>
+            <div class="layer">
+                <h3>User Interaction Layer</h3>
+                <p>Telegram App & WebSocket Client (:18789)</p>
+            </div>
+            <div class="layer">
+                <h3>Network Adaptation Layer</h3>
+                <p>Telegram Bot Core & WebSocket Gateway</p>
+            </div>
+            <div class="layer">
+                <h3>Message Bus</h3>
+                <p>FreeRTOS Inbound/Outbound Queues (mimi_msg_t)</p>
+            </div>
+            <div class="layer">
+                <h3>AI Agent Loop (Core 1)</h3>
+                <p>ReAct Pattern: Context Builder → LLM Call → Tool Execution</p>
+            </div>
+            <div class="layer">
+                <h3>Tool Execution Layer</h3>
+                <p>web_search, cron_add, read_file, write_file, get_time</p>
+            </div>
+            <div class="layer">
+                <h3>Hardware Layer</h3>
+                <p>ESP32-S3 (240MHz Dual-core), ST77916 LCD, I2S MEMS Mic</p>
+            </div>
+        </section>
+
+        <!-- Features Section -->
+        <section id="features">
+            <h2>Core Features</h2>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <h3>🎙️ Voice AI</h3>
+                    <p>FunASR Integration for real-time speech recognition. I2S microphone capture at 16kHz PCM.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>💬 LLM Chat</h3>
+                    <p>Multi-provider support: MiniMax, OpenAI, Anthropic, Ollama. Streaming responses via Telegram.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>⏰ Automation</h3>
+                    <p>Built-in Cron scheduler and Heartbeat service for autonomous task execution.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>🌐 Connectivity</h3>
+                    <p>WiFi Manager, WebSocket Server, HTTP Proxy, and OTA Updates.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>🎨 UI/UX</h3>
+                    <p>1.85" Round LCD (360x360) with LVGL graphics. "Hand Mi" branding and chat interface.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>💾 Local Memory</h3>
+                    <p>SPIFFS-based storage for SOUL.md, USER.md, MEMORY.md, and session history.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Tech Specs Section -->
+        <section id="specs">
+            <h2>Technical Specifications</h2>
+            <div class="terminal-window">
+                <div class="terminal-content" id="terminal-output">
+                    <!-- Specs will be injected here by JS -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <section id="footer">
+            <div class="vault-tec">VAULT-TEC</div>
+            <p class="disclaimer">Vault-Tec is not responsible for any unforeseen data corruption, ghoulification, or existential dread. All systems nominal.</p>
+            <p style="margin-top: 2rem; font-size: 1.2rem;">Preparing for the Future!</p>
+        </section>
+    </div>
+
+    <script>
+        gsap.registerPlugin(ScrollTrigger);
+
+        // Hero Animation
+        const heroTl = gsap.timeline();
+        heroTl.to("#hero .logo", {
+            scale: 1,
+            duration: 1.5,
+            ease: "elastic.out(1, 0.5)"
+        })
+        .to("#hero .tagline", {
+            opacity: 1,
+            duration: 1,
+            ease: "power2.out"
+        }, "-=0.5")
+        .to("#hero .subtitle", {
+            opacity: 1,
+            duration: 1,
+            ease: "power2.out"
+        }, "-=0.5");
+
+        // Architecture Layers Reveal
+        gsap.utils.toArray(".layer").forEach((layer, i) => {
+            gsap.to(layer, {
+                scrollTrigger: {
+                    trigger: layer,
+                    start: "top 80%",
+                    end: "top 50%",
+                    toggleActions: "play none none reverse"
+                },
+                opacity: 1,
+                x: 0,
+                duration: 0.8,
+                delay: i * 0.1,
+                ease: "power2.out"
+            });
+        });
+
+        // Features Stagger
+        gsap.to(".feature-card", {
+            scrollTrigger: {
+                trigger: "#features",
+                start: "top 70%"
+            },
+            opacity: 1,
+            y: 0,
+            duration: 0.6,
+            stagger: 0.15,
+            ease: "back.out(1.7)"
+        });
+
+        // Terminal Typewriter Effect
+        const specs = [
+            { key: "MCU", value: "ESP32-S3 (Xtensa dual-core 240MHz)" },
+            { key: "Display", value: "1.85\" ST77916 IPS LCD, 360×360 round" },
+            { key: "Microphone", value: "I2S MEMS (GPIO 2/15/39), 16kHz PCM" },
+            { key: "Storage", value: "16MB Flash (12MB SPIFFS)" },
+            { key: "Memory", value: "8MB PSRAM + 512KB SRAM" },
+            { key: "OS", value: "FreeRTOS (ESP-IDF v5.5+)" },
+            { key: "Graphics", value: "LVGL (Light and Versatile Graphics Library)" },
+            { key: "Connectivity", value: "WiFi STA, WebSocket Server (:18789)" },
+            { key: "AI Providers", value: "MiniMax, OpenAI, Anthropic, Ollama" },
+            { key: "Tools", value: "web_search, cron_add, read_file, write_file, get_time" }
+        ];
+
+        const terminalOutput = document.getElementById('terminal-output');
+        specs.forEach((spec, i) => {
+            const line = document.createElement('div');
+            line.className = 'spec-line';
+            line.innerHTML = `<span class="spec-key">${spec.key}:</span> ${spec.value}`;
+            terminalOutput.appendChild(line);
+        });
+
+        gsap.to(".spec-line", {
+            scrollTrigger: {
+                trigger: "#specs",
+                start: "top 60%",
+                scrub: 1
+            },
+            opacity: 1,
+            stagger: 0.1,
+            duration: 0.5
+        });
+
+        // Parallax for Hero
+        gsap.to("#hero", {
+            scrollTrigger: {
+                trigger: "#hero",
+                start: "top top",
+                end: "bottom top",
+                scrub: true
+            },
+            y: 100,
+            opacity: 0.5
+        });
+
+    </script>
+</body>
+</html>

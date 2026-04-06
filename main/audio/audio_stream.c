@@ -9,6 +9,7 @@
 #include "freertos/task.h"
 #include <stdbool.h>
 #include <string.h>
+#include "freertos/semphr.h"
 
 static const char *TAG = "audio_stream";
 static bool stream_running = false;

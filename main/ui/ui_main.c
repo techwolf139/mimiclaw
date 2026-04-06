@@ -6,6 +6,7 @@
 #include "screen_manager.h"
 #include "ui_state.h"
 #include "ui_sound.h"
+#include "ui_event.h"
 #include "ui_chat.h"
 #include "ui_subtitle.h"
 #include "config_screen.h"
@@ -25,6 +26,8 @@ static const char *TAG = "ui_main";
 #define UI_TASK_PRIORITY   4
 #define UI_TASK_STACK_SIZE 8192
 #define UI_TASK_CORE       1
+
+static void ui_event_handler(const ui_event_t *event, void *user_data);
 
 static TaskHandle_t ui_task_handle;
 static lv_display_t *disp;
@@ -77,6 +80,8 @@ static void ui_task(void *arg)
                 }
             }
         }
+
+        ui_event_process(0, ui_event_handler, NULL);
         
         vTaskDelay(pdMS_TO_TICKS(task_delay));
     }
@@ -89,7 +94,7 @@ static void nav_btn_clicked(lv_event_t *e) {
     if (s_mgr) {
         if (screen_manager_get_active(s_mgr) == screen_id) {
             screen_manager_hide_all(s_mgr);
-            lv_obj_clear_flag(main_screen_cont, LV_OBJ_FLAG_HIDDEN);
+            if (main_screen_cont) lv_obj_clear_flag(main_screen_cont, LV_OBJ_FLAG_HIDDEN);
             ui_chat_hide();
             ui_status_hide();
             ui_skills_hide();
@@ -97,7 +102,7 @@ static void nav_btn_clicked(lv_event_t *e) {
             ui_reminder_hide();
             if (status_text) lv_label_set_text(status_text, "Ready");
         } else {
-            lv_obj_add_flag(main_screen_cont, LV_OBJ_FLAG_HIDDEN);
+            if (main_screen_cont) lv_obj_add_flag(main_screen_cont, LV_OBJ_FLAG_HIDDEN);
             ui_chat_hide();
             ui_status_hide();
             ui_skills_hide();
@@ -248,6 +253,11 @@ esp_err_t ui_init(void) {
     s_mgr = screen_manager_init(disp);
     if (s_mgr == NULL) {
         ESP_LOGE(TAG, "Failed to create screen manager");
+        ui_chat_destroy();
+        ui_status_destroy();
+        ui_skills_destroy();
+        ui_music_destroy();
+        ui_reminder_destroy();
         return ESP_FAIL;
     }
 
@@ -280,8 +290,37 @@ esp_err_t ui_start(void) {
 
 void ui_main_set_status(const char *text)
 {
-    if (status_text == NULL || text == NULL) {
-        return;
+    if (text == NULL) return;
+    
+    ui_event_data_t event_data = {0};
+    event_data.status_update.text = (char *)text;
+    
+    esp_err_t ret = ui_event_post(UI_EVENT_STATUS_UPDATE, &event_data);
+    if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to post status event: %d", ret);
     }
-    lv_label_set_text(status_text, text);
+}
+
+static void ui_event_handler(const ui_event_t *event, void *user_data)
+{
+    if (event == NULL) return;
+    
+    switch (event->type) {
+        case UI_EVENT_STATUS_UPDATE:
+            if (status_text != NULL && event->data.status_update.text != NULL) {
+                lv_label_set_text(status_text, event->data.status_update.text);
+            }
+            break;
+            
+        case UI_EVENT_LABEL_SET_TEXT:
+            if (event->data.label_set_text.label_obj != NULL && 
+                event->data.label_set_text.text != NULL) {
+                lv_label_set_text(event->data.label_set_text.label_obj, 
+                                 event->data.label_set_text.text);
+            }
+            break;
+            
+        default:
+            break;
+    }
 }
